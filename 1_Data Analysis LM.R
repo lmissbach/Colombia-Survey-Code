@@ -2,11 +2,11 @@
 
 if(!require("pacman")) install.packages("pacman")
 
-p_load("arrow", "ggsci", "fixest", "haven", "Hmisc", "openxlsx", "rattle", "scales", "tidyverse", "sjlabelled", "tidymodels")
+p_load("arrow", "ggsci", "fixest", "haven", "Hmisc", "openxlsx", "rattle", "scales", "tidyverse", "sjlabelled", "tidymodels", "tidytext")
 
 options(scipen=999)
 
-# 0.  Load data ####
+# 0.    Load data ####
 
 data_0 <- read_sav("../X_Paper_Colombia_Experiment/Analysis/Inputs/DE_124764_Brandenb_TU_Mcc_Berlin_Kolumbien  Ad hoc - final.sav")
 
@@ -17,7 +17,7 @@ predictions     <- read_csv("../2_Predictions/Colombia 65/Predictions_Synthetic_
 
 #quantile(read_csv("../Colombia EXP/Predictions_Entire_Dataset_expenditures.csv")$.pred, prob = 0.5)  # Median costs: 10,802,917
 
-# 1. Renaming and cleaning (TBD) ####
+# 1.    Renaming and cleaning (TBD) ####
 
 # Update later
 
@@ -71,7 +71,7 @@ data_1.1 <- bind_rows(data_1.1.1, data_1.1.2, data_1.1.3)%>%
 
 rm(data_1.1.1, data_1.1.2, data_1.1.3)
 
-# 1.1 Individual cost treatment ####
+# 1.1   Individual cost treatment ####
 
 # Income Group, Province
 
@@ -126,7 +126,7 @@ predictions_2 <- left_join(data_indiv, predictions_1)
 
 rm(data_indiv, predictions_1, predictions)
 
-# 2. Main Analysis ####
+# 2.    Main Analysis ####
 
 tex.style <- style.tex(model.title = "", fixef.title = "\\midrule Fixed Effects",
                        stats.title = "\\midrule", model.format = "",
@@ -140,7 +140,7 @@ dict_latex <- c(support = "Support (1-5)", "conditional_support" = "Conditional 
                 "rr_pobre" = "Poor", "rr_afctds" = "Affected", "rr_deuda" = "Reduce debt", "rr_impuesto" = "Tax red.",
                 "rr_lmpsm" = "LST", "rr_etransp" = "Transport", "rr_paz" = "Paz Total", "rr_edu" = "Education", "rr_ncer" = "Renewables", "rr_deforst" = "Deforestation")
 
-# 2.1 H1 ####
+# 2.1   H1 ####
 # Conditional support is higher than unconditional support
 
 # OLS
@@ -248,7 +248,7 @@ dev.off()
 
 rm(data_1.X, P_0)
 
-# 2.2 H2 ####
+# 2.2   H2 ####
 
 # Additional information on the effects of removing fossil fuel subsidy will increase respondents unconditional and conditional support for FFSR.
 
@@ -492,7 +492,7 @@ model_2.2.4.D <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_D,
 
 rm(data_2.2.4.D, model_2.2.4.D)
 
-# 2.3 H3 ####
+# 2.3   H3 ####
 
 # Additional information will increase unconditional and conditional support of respondents who do not endorse the incumbent president.
 
@@ -539,7 +539,7 @@ etable(model_3.3, tex = TRUE, dict = dict_latex,
 rm(model_3.3)
 
 
-# 3. Supplementary Analyses ####
+# 3.    Supplementary Analyses ####
 
 # Unconditional support over perceived right to receive subsidies
 
@@ -1985,9 +1985,380 @@ jpeg("../Colombia_Survey_Experiment/Paper/Figures/3_Supplementary/Figure_S13.jpg
 print(P_13)
 dev.off()
 
-# 4. Figures ####
+# 4.    Figures ####
 
-# Tests ####
+
+# 5.    Descriptive statistics / ML-support ####
+
+# Variation in which variables drive variation in outcomes?
+
+data_5 <- data_1 %>%
+  mutate(Group = ifelse(T_A == 1 | C_A == 1, "A",
+                        ifelse(T_B == 1 | C_B == 1, "B",
+                               ifelse(T_C == 1 | C_C == 1, "C",
+                                      ifelse(T_D == 1 | C_D == 1, "D", "Control")))))%>%
+  mutate(Group = factor(Group, level = c("Control", "A", "B", "C", "D")))%>%
+  select(edad:cc_imp_equit,pol_pres:izq_der,prop_eschr_labrl:pais_econ, ffsr_gnrl:protestas, unconditional_prcl, rr_lmpsm:rr_deforst, treatment, Group, -attn1, -attn2)%>%
+  select(treatment, Group, everything(), unconditional_prcl, starts_with("rr_"))%>%
+  select(-carro_combus_other_ans, -precio_combus)%>%
+  mutate(prop_acrd_labrl = ifelse(is.na(prop_entd_labrl),2,
+                                  ifelse(is.na(prop_acrd_labrl),3,prop_acrd_labrl)),
+         prop_acrd_pensl = ifelse(is.na(prop_entd_pensl),2,
+                                  ifelse(is.na(prop_acrd_pensl),3,prop_acrd_pensl)),
+         prop_acrd_fepc = ifelse(is.na(prop_entd_fepc),2,
+                                 ifelse(is.na(prop_acrd_fepc),3,prop_acrd_fepc)),
+         prop_acrd_salud = ifelse(is.na(prop_entd_salud),2,
+                                  ifelse(is.na(prop_acrd_salud),3,prop_acrd_salud)),
+         prop_acrd_paz = ifelse(is.na(prop_entd_paz),2,
+                                ifelse(is.na(prop_acrd_paz),3,prop_acrd_paz)),
+         prop_acrd_energ = ifelse(is.na(prop_entd_energ),2,
+                                  ifelse(is.na(prop_acrd_energ),3,prop_acrd_energ)),
+         prop_acrd_ning = ifelse(is.na(prop_entd_ning),2,
+                                 ifelse(is.na(prop_acrd_ning),3,prop_acrd_ning)))%>%
+  # Convert to factors
+  mutate_at(vars(gnro:protestas, -ffsr_dsl, -ffsr_gas, -ffsr_gnrl), ~ haven::as_factor(.))%>%
+  # Get rid of NAs
+  mutate(moto_dias  = replace(moto_dias, is.na(moto_dias), "No days"),
+         carro_dias = replace(carro_dias, is.na(carro_dias), "No days"))%>%
+  mutate_at(vars(starts_with("carro_combus_")), ~ replace(., is.na(.), "No"))%>%
+  mutate_at(vars(transpub_dias, taxi_dias, bici_dias), ~ replace(., is.na(.), "Never"))%>%
+  mutate(izq_der    = fct_expand(izq_der, "Apolitico"),
+         izq_der    = replace(izq_der, is.na(izq_der), "Apolitico"),
+         pais_gnrl  = fct_expand(pais_gnrl, "Prefiero no decir"),
+         pais_gnrl  = replace(pais_gnrl, is.na(pais_gnrl), "Prefiero no decir"))%>%
+  select(-starts_with("prop_entd_"), -starts_with("prop_eschr_"))%>%
+  mutate_at(vars(starts_with("prop_acrd_")), ~ factor(., labels = c("No", "Yes", "Not heard", "Not understood")))%>%
+  mutate(ffsr_dsl = ifelse(is.na(ffsr_dsl), ffsr_gnrl, ffsr_dsl),
+         ffsr_gas = ifelse(is.na(ffsr_gas), ffsr_gnrl, ffsr_gas))%>%
+  mutate_at(vars(ffsr_dsl, ffsr_gas), ~ factor(., labels = c("Yes", "I don't know", "No")))%>%
+  mutate(ffsr_gnrl = haven::as_factor(ffsr_gnrl))%>%
+  mutate(unconditional_prcl = haven::as_factor(unconditional_prcl))
+
+# 5.1   Support for unconditional FFSR ####
+
+data_5.1 <- data_5 %>%
+  select(-starts_with("rr_"),-mncp)%>%
+  # Based on first examination
+  select(-bici_dias, -starts_with("carro_combus"), -ccnr, -Group, -grp_ingrso, -protestas, -taxi_dias, -urban, - bici, -carro, -cc_econ, -cc_futuro, -gas_super, -moto,
+         -pais_confianza_congrs, -pais_confianza_parties, -prop_acrd_ning, -taxi, -transpub, -treatment)
+
+data_5.1 <- data_5.1 %>%
+  # Create noise parameter
+  mutate(noise = rnorm(nrow(.),0,1))
+
+data_5.2 <- data_5.1 %>%
+  initial_split(prop = 0.8)
+
+# Data for training
+data_5.2.train <- data_5.2 %>%
+  training()
+
+# Data for testing
+data_5.2.test <- data_5.2 %>%
+  testing()
+
+rm(data_5.1, data_5.2)
+
+recipe_0 <- recipe(unconditional_prcl ~ .,
+                   data = data_5.2.train)%>%
+  # Deletes all columns with any NA
+  step_filter_missing(all_predictors(), threshold = 0)%>%
+  # Remove minimum number of columns such that correlations are less than 0.9
+  step_corr(all_numeric(), -all_outcomes(), threshold = 0.9)%>%
+  # should have very few unique observations for factors
+  # step_other(all_nominal(), -edad, -grp_ingrso, threshold = 0.03)%>%
+  step_dummy(all_nominal(), -all_outcomes())
+
+data_5.2.training <- recipe_0 %>%
+  prep(training = data_5.2.train)%>%
+  bake(new_data = NULL)
+
+data_5.2.testing <- recipe_0 %>%
+  prep(training = data_5.2.test)%>%
+  bake(new_data = NULL) 
+
+# Five-fold cross-validation
+
+folds_1 <- vfold_cv(data_5.2.training, v = 5, strata = unconditional_prcl)
+
+# Setup model to be tuned
+
+# Tuning time: 80 minutes
+
+model_brt <- boost_tree(
+  trees         = 1000,
+  tree_depth    = tune(), # maximum depth of tree
+  learn_rate    = tune(), # the higher the learning rate the faster - default 0.3
+  # min_n       = tune(),
+  mtry          = tune(), # fraction of features to be selected for each tree (0.5/0.7/1)
+  # stop_iter   = tune(),
+  # sample_size = tune()
+)%>%
+  set_mode("classification")%>%
+  set_engine("xgboost")
+
+# Create a tuning grid - 16 different models for the tuning space
+
+grid_0 <- grid_latin_hypercube(
+  tree_depth(),
+  learn_rate(c(-3,-0.5)),# tuning parameters
+  mtry(c(round((ncol(data_5.2.training)-1)/2,0), ncol(data_5.2.training)-1)),
+  size = 20)%>%
+  # default parameters
+  bind_rows(data.frame(tree_depth = 6, learn_rate = 0.3, mtry = ncol(data_5.2.training)-1))
+
+# Tune the model - cover the entire parameter space without running every combination
+
+print("Start computing")
+
+doParallel::registerDoParallel()
+
+time_1 <- Sys.time()
+
+model_brt_1 <- tune_grid(model_brt,
+                         unconditional_prcl ~ .,
+                         resamples = folds_1,
+                         grid      = grid_0,
+                         metrics   = metric_set(accuracy, mn_log_loss, f_meas))
+
+time_2 <- Sys.time()
+
+doParallel::stopImplicitCluster()
+
+print("End computing")
+
+# Collect metrics of tuned models
+
+metrics_1 <- collect_metrics(model_brt_1)
+
+model_brt_1.1 <- select_best(model_brt_1, metric = "accuracy")
+
+metrics_1.1 <- metrics_1 %>%
+  filter(.config == model_brt_1.1$.config[1])
+
+# Fit best model after tuning
+model_brt <- boost_tree(
+  trees      = 1000,
+  tree_depth = 5,     # metrics_1.1$tree_depth[1] # 5
+  learn_rate = 0.007, # metrics_1.1$learn_rate[1] # 0.007
+  mtry = 170          # metrics_1.1$mtry[1]       # 170
+)%>%
+  set_mode("classification")%>%
+  set_engine("xgboost")
+
+model_brt_2 <- model_brt %>%
+  fit(unconditional_prcl ~ .,
+      data = data_5.2.training)
+
+predictions_0 <- augment(model_brt_2, new_data = data_5.2.testing) 
+
+accuracy(predictions_0, truth = unconditional_prcl, estimate = .pred_class) # 0.39
+
+# Class-wise accuracy
+cw_accuracy <- predictions_0 %>%
+  mutate(correct = ifelse(unconditional_prcl == .pred_class,1,0))%>%
+  group_by(unconditional_prcl)%>%
+  summarise(class_accuracy = mean(correct))%>%
+  ungroup()
+
+mn_log_loss(predictions_0, truth = unconditional_prcl, estimate = c(".pred_Strongly disagree", ".pred_Disagree", ".pred_Neutral", ".pred_Agree", ".pred_Strongly agree")) # 1.44
+
+conf_mat(predictions_0, truth = unconditional_prcl, estimate = .pred_class)
+
+data_5.2.testing_matrix <- data_5.2.testing %>%
+  select(-unconditional_prcl)%>%
+  as.matrix()
+
+data_5.2.training_matrix <- data_5.2.training %>%
+  select(-unconditional_prcl)%>%
+  as.matrix()
+
+time_3 <- Sys.time()
+
+shap_1 <- predict(extract_fit_engine(model_brt_2),
+                  data_5.2.testing_matrix,
+                  predcontrib = TRUE,
+                  approxcontrib = FALSE)
+
+time_4 <- Sys.time()
+
+evaluate_SHAP <- function(shap_0, unconditional_prcl_0){
+  shap_1.1 <- shap_0 %>%
+    as_tibble()%>%
+    summarise_all(~ mean(abs(.)))%>%
+    select(-BIAS)%>%
+    pivot_longer(everything(), names_to = "variable", values_to = "SHAP_contribution")%>%
+    arrange(desc(SHAP_contribution))%>%
+    mutate(tot_contribution = sum(SHAP_contribution))%>%
+    mutate(share_SHAP = SHAP_contribution/tot_contribution)%>%
+    select(-tot_contribution)%>%
+    mutate(unconditional_prcl = unconditional_prcl_0)
+  
+  shap_1.2 <- shap_1.1 %>%
+    mutate(VAR_0 = case_when(grepl("dept_", variable) ~ "Department",
+                             grepl(".COP", variable) ~ "Income",
+                             grepl("edad", variable) ~ "Age",
+                             grepl("gnro", variable) ~ "Gender",
+                             grepl("etnia_", variable) ~ "Ethnicity",
+                             grepl("ccnr", variable) ~ "Cooking fuel",
+                             grepl("edu_", variable) ~ "Education",
+                             grepl("urban", variable) ~ "Urban",
+                             grepl("trbjo_", variable) ~ "Occupation",
+                             grepl("moto_dias", variable)     ~ "Motorcycle (days)",
+                             grepl("carro_dias", variable)    ~ "Car (days)",
+                             grepl("transpub_dias", variable) ~ "Public transport (days)",
+                             grepl("taxi_dias", variable)     ~ "Taxi (days)",
+                             grepl("bici_dias", variable)     ~ "Bicycle (days)",
+                             
+                             grepl("benefic", variable) ~ "Benefitted",
+                             grepl("Group_", variable) ~ variable,
+                             variable %in% c("bici_Yes", "carro_Yes", "moto_Yes", "transpub_Yes", "taxi_Yes", "treatment", "noise") ~ variable,
+                             grepl("carro_combus", variable) ~ "Car combustible",
+                             grepl("cc_econ", variable)      ~ "cc_econ",
+                             grepl("cc_futuro", variable)    ~ "cc_futuro",
+                             grepl("cc_info", variable)      ~ "cc_info",
+                             grepl("cc_preocup", variable)   ~ "cc_preocup",
+                             grepl("cc_imp_co2", variable)   ~ "Climate policy should reduce emissions",
+                             grepl("cc_imp_pers", variable)  ~ "Climate policy should incur low costs",
+                             grepl("cc_imp_equit", variable) ~ "Climate policy should be equitable",
+                             grepl("derecho", variable) ~ "Right to receive subsidy",
+                             grepl("estrto", variable) ~ "estrto",
+                             grepl("grp_ingrso", variable) ~ "Income group",
+                             grepl("izq_der", variable) ~ "Left/right",
+                             grepl("dsl_super", variable) ~ "dsl_super",
+                             grepl("gas_super", variable) ~ "gas_super",
+                             grepl("ffsr_dsl", variable)  ~ "Is diesel subsidized?",
+                             grepl("ffsr_gas", variable)  ~ "ffsr_gas",
+                             grepl("ffsr_gnrl", variable) ~ "Are fuels subsidized?",
+                             grepl("pais_confianza_army",    variable) ~ "pais_confianza_army",
+                             grepl("pais_confianza_con_crt", variable) ~ "pais_confianza_con_crt",
+                             grepl("pais_confianza_congrs",  variable) ~ "pais_confianza_congrs",
+                             grepl("pais_confianza_parties", variable) ~ "pais_confianza_parties",
+                             grepl("pais_confianza_jst_crt", variable) ~ "pais_confianza_jst_crt",
+                             grepl("pais_confianza_gvnrs",   variable) ~ "pais_confianza_gvnrs",
+                             grepl("pais_confianza_mayors",  variable) ~ "pais_confianza_mayors",
+                             grepl("pais_confianza_prsdnt",  variable) ~ "pais_confianza_prsdnt",
+                             grepl("pais_confianza_police",  variable) ~ "pais_confianza_police",
+                             grepl("pais_econ", variable)  ~ "What is the economic situation",
+                             grepl("pais_dmcrc", variable) ~ "pais_dmcrc",
+                             grepl("pais_gnrl", variable)  ~ "pais_gnrl",
+                             grepl("yo_amnto", variable) ~ "Affected by price increase",
+                             grepl("pobre_amnto", variable) ~ "Poor affected by price increase",
+                             grepl("rica_amnto", variable)  ~ "Rich affected by price increase",
+                             grepl("pol_pres", variable) ~ "Voted for president",
+                             grepl("prop_acrd_labrl", variable) ~ "prop_acrd_labrl",
+                             grepl("prop_acrd_pensl", variable) ~ "prop_acrd_pensl",
+                             grepl("prop_acrd_fepc", variable)  ~ "Agree with FFSR",
+                             grepl("prop_acrd_salud", variable) ~ "prop_acrd_salud",
+                             grepl("prop_acrd_paz", variable)   ~ "prop_acrd_paz",
+                             grepl("prop_acrd_energ", variable) ~ "prop_acrd_energ",
+                             grepl("prop_acrd_ning", variable)  ~ "prop_acrd_ning",
+                             grepl("prsns", variable) ~ "Household size",
+                             grepl("protestas", variable) ~ "Protests",
+                             .default = NA))%>%
+    arrange(variable)%>%
+    group_by(VAR_0)%>%
+    summarise(share_SHAP = sum(share_SHAP))%>%
+    ungroup()%>%
+    arrange(desc(share_SHAP))%>%
+    mutate(unconditional_prcl = unconditional_prcl_0)
+  
+  list_0 <- list("shap_1.1" = shap_1.1, "shap_1.2" = shap_1.2)
+  
+  return(list_0)
+}
+
+shap_A_1 <- evaluate_SHAP(shap_1[[1]], "1")$shap_1.1
+shap_A_2 <- evaluate_SHAP(shap_1[[2]], "2")$shap_1.1
+shap_A_3 <- evaluate_SHAP(shap_1[[3]], "3")$shap_1.1
+shap_A_4 <- evaluate_SHAP(shap_1[[4]], "4")$shap_1.1
+shap_A_5 <- evaluate_SHAP(shap_1[[5]], "5")$shap_1.1
+
+shap_B_1 <- evaluate_SHAP(shap_1[[1]], "1")$shap_1.2
+shap_B_2 <- evaluate_SHAP(shap_1[[2]], "2")$shap_1.2
+shap_B_3 <- evaluate_SHAP(shap_1[[3]], "3")$shap_1.2
+shap_B_4 <- evaluate_SHAP(shap_1[[4]], "4")$shap_1.2
+shap_B_5 <- evaluate_SHAP(shap_1[[5]], "5")$shap_1.2
+
+shap_A <- bind_rows(shap_A_1, shap_A_2, shap_A_3, shap_A_4, shap_A_5)
+shap_B <- bind_rows(shap_B_1, shap_B_2, shap_B_3, shap_B_4, shap_B_5)
+
+rm(shap_A_1, shap_A_2, shap_A_3, shap_A_4, shap_A_5, shap_B_1, shap_B_2, shap_B_3, shap_B_4, shap_B_5)
+
+# What is the single most important feature across level predictions?
+
+shap_B_1 <- shap_B %>%
+  group_by(VAR_0)%>%
+  summarise(share_SHAP = mean(share_SHAP))%>%
+  ungroup()%>%
+  mutate(unconditional_prcl = "0")
+
+# Inspect characteristics that are below noise for every characteristic
+
+shap_B_2 <- shap_B %>%
+  bind_rows(shap_B_1)%>%
+  mutate(help = ifelse(VAR_0 == "noise", share_SHAP,0))%>%
+  group_by(unconditional_prcl)%>%
+  mutate(help = sum(help))%>%
+  ungroup()%>%
+  # Lower than noise
+  filter(share_SHAP < help)%>%
+  group_by(VAR_0)%>%
+  summarise(number = n())%>%
+  ungroup()%>%
+  arrange(desc(number))
+
+shap_B_3 <- shap_B %>%
+  bind_rows(shap_B_1)%>%
+  arrange(unconditional_prcl, desc(share_SHAP))%>%
+  group_by(unconditional_prcl)%>%
+  mutate(number = 1:n())%>%
+  ungroup()%>%
+  mutate(VAR_0 = ifelse(number > 4, "Other features", VAR_0))%>%
+  group_by(unconditional_prcl, VAR_0)%>%
+  summarise(share_SHAP = sum(share_SHAP))%>%
+  ungroup()%>%
+  filter(VAR_0 != "Other features")%>%
+  mutate(VAR_0 = reorder_within(VAR_0, share_SHAP, unconditional_prcl))%>%
+  mutate(unconditional_prcl = case_when(unconditional_prcl == 1 ~ "Strongly disagree (Accuracy: 0.61)",
+                                     unconditional_prcl == 2 ~ "Disagree (Accuracy: 0.24)",
+                                     unconditional_prcl == 3 ~ "Neutral (Accuracy: 0.44)",
+                                     unconditional_prcl == 4 ~ "Agree (Accuracy: 0.30)",
+                                     unconditional_prcl == 5 ~ "Strongly agree (Accuracy: 0.16)",
+                                     unconditional_prcl == 0 ~ "Overall (Accuracy: 0.4)"))%>%
+  mutate(unconditional_prcl = factor(unconditional_prcl, levels = c("Overall (Accuracy: 0.4)", "Strongly disagree (Accuracy: 0.61)", "Disagree (Accuracy: 0.24)", "Neutral (Accuracy: 0.44)", "Agree (Accuracy: 0.30)", "Strongly agree (Accuracy: 0.16)")))
+
+P_5.1 <- ggplot(shap_B_3)+
+  geom_col(aes(x = VAR_0, y = share_SHAP), width = 0.75, fill = "lightgrey", colour = "black")+
+  facet_wrap(. ~ unconditional_prcl, scales = "free_y")+
+  scale_x_discrete(labels = function(x) sub("__.*$", "", x))+  # Remove appended suffix
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), expand = c(0,0), breaks = c(0,0.05,0.1,0.15))+
+  coord_flip(ylim = c(0,0.159))+
+  theme_bw()+
+  ylab("Feature importance")+
+  xlab("Feature")+
+  theme(axis.text     = element_text(size = 7),
+        title           = element_text(size = 7),
+        strip.text      = element_text(size = 8),
+        axis.title      = element_text(size = 8),
+        legend.text     = element_text(size = 7),
+        legend.position = "bottom",
+        legend.title    = element_blank(),
+        legend.key.size = unit(0.5, "cm"))
+
+jpeg("../Colombia_Survey_Experiment/Paper/Figures/3_Supplementary/Figure_SHAP.jpg", width = 30, height = 10, unit = "cm", res = 600)
+print(P_5.1)
+dev.off()
+
+rm(cw_accuracy, data_5, data_5.2.test, data_5.2.testing, data_5.2.train, data_5.2.training, data_5.2.testing_matrix, data_5.2.training_matrix,
+   shap_A, shap_B, shap_B_1, shap_B_2, shap_B_3, time_3, time_4, evaluate_SHAP, P_5.1)
+
+# 5.2   Support for conditional FFSR ####
+
+# 5.3   Descriptive statistics in general ####
+
+
+# 9.    Tests ####
 
 test <- data_1.1 %>%
   filter(type_support == "conditional")
@@ -2062,7 +2433,7 @@ tidy_2.3.4 <- tidy(model_2.3.4)%>%
 # Compare supporters and non-supporters.
 # Compare treatment effects for all information treatments among both groups.
 
-# 2.0 Supplementary Graphics ####
+# 9.1 Supplementary Graphics ####
 
 data_0.1 <- data_1 %>%
   mutate(IQ = ifelse(ingrso %in% c(1,2),"IQ1",
