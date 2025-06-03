@@ -140,6 +140,8 @@ dict_latex <- c(support = "Support (1-5)", "conditional_support" = "Conditional 
                 "rr_pobre" = "Poor", "rr_afctds" = "Affected", "rr_deuda" = "Reduce debt", "rr_impuesto" = "Tax red.",
                 "rr_lmpsm" = "LST", "rr_etransp" = "Transport", "rr_paz" = "Paz Total", "rr_edu" = "Education", "rr_ncer" = "Renewables", "rr_deforst" = "Deforestation")
 
+hypotheses_0 <- data.frame()
+
 # 2.1   H1 ####
 # Conditional support is higher than unconditional support
 
@@ -155,6 +157,12 @@ model_1.4 <- feols(support ~ conditional_support | ID, data = filter(data_1.1, i
 # tidy_1.1  <- tidy(model_1.1)%>%
 #   mutate(type = "OLS")
 
+tidy_1.4 <- tidy(model_1.4)%>%
+  mutate(Type = "H1")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_1.4)
+
 etable(model_1.1, model_1.2, model_1.3, model_1.4, tex = TRUE, dict = dict_latex,
        file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H1.tex", fitstat = c("n", "r2"),
        digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
@@ -167,7 +175,7 @@ etable(model_1.1, model_1.2, model_1.3, model_1.4, tex = TRUE, dict = dict_latex
                  paste0("This table displays results from OLS regression REF on the support for a partial fossil fuel subsidy reform over whether such a reform would include compensation (conditional support) or not (unconditional support). The dependent variable expresses support on a five-point Lickert-scale. For conditional support, this variable is the rounded average support over ten different options for partial fossil fuel subsidy reform and one form of compensation. In Model (2), the dependent variable is the non-rounded average. Model (3) includes control variables for respondents receiving different first-stage questions (reference: control group) and for the treatment group. Model (4) includes a respondent-level fixed effect."))
 )
 
-rm(model_1.1, model_1.2, model_1.3, model_1.4)
+rm(model_1.1, model_1.2, model_1.3, model_1.4, tidy_1.4)
 
 # Logit
 # support (0 (1-2)/1(4-5)) over conditional_support (0/1)
@@ -264,9 +272,15 @@ model_1.2.2 <- feols(support ~ treatment + First_Stage, data = data_1.2.1)
 #   mutate(Type         = "OLS",
 #          type_support = "Unconditional")
 
+tidy_1.2.1 <- tidy(model_1.2.1)%>%
+  mutate(Type = "H2",
+         Outcome = "Unconditional")%>%
+  filter(term == "treatment")
+
 data_1.2.2 <- data_1.1 %>%
   # Conditional support
   filter(conditional_support == 1)%>%
+  filter(is.na(Type))%>%
   mutate(First_Stage = ifelse(Group == "Control", "No","Yes"))
 
 model_1.2.3 <- feols(support ~ treatment + Group, data = data_1.2.2)
@@ -274,6 +288,15 @@ model_1.2.4 <- feols(support ~ treatment + First_Stage, data = data_1.2.2)
 # tidy_1.2.1 <- tidy(model_1.2.2)%>%
 #   mutate(Type         = "OLS",
 #          type_support = "Conditional")
+
+tidy_1.2.3 <- tidy(model_1.2.3)%>%
+  mutate(Type = "H2",
+         Outcome = "Conditional")%>%
+  filter(term == "treatment")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_1.2.1)%>%
+  bind_rows(tidy_1.2.3)
 
 etable(model_1.2.1, model_1.2.2, model_1.2.3, model_1.2.4, tex = TRUE, dict = dict_latex,
        file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.tex", fitstat = c("n", "r2"),
@@ -286,7 +309,7 @@ etable(model_1.2.1, model_1.2.2, model_1.2.3, model_1.2.4, tex = TRUE, dict = di
                  paste0("This table displays results from an OLS regression REF on the unconditional and conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the fossil fuel subsidy reform. The dependent variable expresses support on a five-point Lickert-scale. For conditional support, this variable is the rounded average support over ten different options for partial fossil fuel subsidy reform and one form of compensation."))
 )
 
-rm(data_1.2.1, data_1.2.2, model_1.2.1, model_1.2.2, data_1.1)
+rm(data_1.2.1, data_1.2.2, model_1.2.1, model_1.2.2, data_1.1, tidy_1.2.1, tidy_1.2.3)
 
 # Prep for Sub-Hypotheses
 
@@ -330,7 +353,24 @@ etable(model_2.2.1.2, tex = TRUE, dict = dict_latex,
        notes = c("\\medskip \\textit{Note:}",
                  paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about respondent-specific personal financial effects from a partial fossil fuel subsidy reform.")))
 
-rm(data_2.2.1, model_2.2.1.1, model_2.2.1.2)
+model_2.2.1.3 <- feols(rr_pobre ~ T_A, data = data_2.2.1)
+model_2.2.1.4 <- feols(rr_afctds ~ T_A, data = data_2.2.1)
+
+tidy_2.2.1.3 <- tidy(model_2.2.1.3)%>%
+  filter(term == "T_A")%>%
+  mutate(Type    = "H2.1",
+         Outcome = "rr_pobre")
+
+tidy_2.2.1.4 <- tidy(model_2.2.1.4)%>%
+  filter(term == "T_A")%>%
+  mutate(Type    = "H2.1",
+         Outcome = "rr_afctds")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_2.2.1.3)%>%
+  bind_rows(tidy_2.2.1.4)
+
+rm(data_2.2.1, model_2.2.1.1, model_2.2.1.2, model_2.2.1.3, model_2.2.1.4, tidy_2.2.1.3, tidy_2.2.1.4)
 
 # Including attention check
 
@@ -396,7 +436,24 @@ etable(model_2.2.2.2, tex = TRUE, dict = dict_latex,
        notes = c("\\medskip \\textit{Note:}",
                  paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the distributional effects from a partial fossil fuel subsidy reform.")))
 
-rm(data_2.2.2, model_2.2.2.1, model_2.2.2.2)
+model_2.2.2.3 <- feols(rr_lmpsm ~ T_B, data = data_2.2.2)
+model_2.2.2.4 <- feols(rr_afctds ~ T_B, data = data_2.2.2)
+
+tidy_2.2.2.3 <- tidy(model_2.2.2.3)%>%
+  filter(term == "T_B")%>%
+  mutate(Type = "H2.2",
+         Outcome = "rr_lmpsm")
+
+tidy_2.2.2.4 <- tidy(model_2.2.2.4)%>%
+  filter(term == "T_B")%>%
+  mutate(Type = "H2.2",
+         Outcome = "rr_afctds")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_2.2.2.3)%>%
+  bind_rows(tidy_2.2.2.4)
+
+rm(data_2.2.2, model_2.2.2.1, model_2.2.2.2, model_2.2.2.3, model_2.2.2.4, tidy_2.2.2.3, tidy_2.2.2.4)
 
 # Including attention check
 
@@ -438,7 +495,41 @@ etable(model_2.2.3.2, tex = TRUE, dict = dict_latex,
        notes = c("\\medskip \\textit{Note:}",
                  paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the efficiency of government resource use.")))
 
-rm(data_2.2.3, model_2.2.3.1, model_2.2.3.2)
+model_2.2.3.3 <- feols(rr_impuesto ~ T_C, data = data_2.2.3)
+model_2.2.3.4 <- feols(rr_deuda    ~ T_C, data = data_2.2.3)
+model_2.2.3.5 <- feols(rr_etransp  ~ T_C, data = data_2.2.3)
+model_2.2.3.6 <- feols(rr_paz      ~ T_C, data = data_2.2.3)
+model_2.2.3.7 <- feols(rr_edu      ~ T_C, data = data_2.2.3)
+
+tidy_2.2.3.3 <- tidy(model_2.2.3.3)%>%
+  filter(term == "T_C")%>%
+  mutate(Type    = "H2.3",
+         Outcome = "rr_impuesto")
+
+tidy_2.2.3.4 <- tidy(model_2.2.3.4)%>%
+  filter(term == "T_C")%>%
+  mutate(Type    = "H2.3",
+         Outcome = "rr_deuda")
+
+tidy_2.2.3.5 <- tidy(model_2.2.3.5)%>%
+  filter(term == "T_C")%>%
+  mutate(Type    = "H2.3",
+         Outcome = "rr_etransp")
+
+tidy_2.2.3.6 <- tidy(model_2.2.3.6)%>%
+  filter(term == "T_C")%>%
+  mutate(Type    = "H2.3",
+         Outcome = "rr_paz")
+
+tidy_2.2.3.7 <- tidy(model_2.2.3.7)%>%
+  filter(term == "T_C")%>%
+  mutate(Type    = "H2.3",
+         Outcome = "rr_edu")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_2.2.3.3, tidy_2.2.3.4, tidy_2.2.3.5, tidy_2.2.3.6, tidy_2.2.3.7)
+
+rm(data_2.2.3, model_2.2.3.1, model_2.2.3.2, model_2.2.3.3, model_2.2.3.4, model_2.2.3.5, model_2.2.3.6, model_2.2.3.7, tidy_2.2.3.3, tidy_2.2.3.4, tidy_2.2.3.5, tidy_2.2.3.6, tidy_2.2.3.7)
 
 # Including attention check
 
@@ -480,7 +571,41 @@ etable(model_2.2.4.2, tex = TRUE, dict = dict_latex,
        notes = c("\\medskip \\textit{Note:}",
                  paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the environmental consequences of fossil fuel subsidies.")))
 
-rm(data_2.2.4, model_2.2.4.1 , model_2.2.4.2)
+model_2.2.4.3 <- feols(rr_etransp ~ T_D, data = data_2.2.4)
+model_2.2.4.4 <- feols(rr_paz     ~ T_D, data = data_2.2.4)
+model_2.2.4.5 <- feols(rr_edu     ~ T_D, data = data_2.2.4)
+model_2.2.4.6 <- feols(rr_ncer    ~ T_D, data = data_2.2.4)
+model_2.2.4.7 <- feols(rr_deforst ~ T_D, data = data_2.2.4)
+
+tidy_2.2.4.3 <- tidy(model_2.2.4.3)%>%
+  filter(term == "T_D")%>%
+  mutate(Type    = "H2.4",
+         Outcome = "rr_etransp")
+
+tidy_2.2.4.4 <- tidy(model_2.2.4.4)%>%
+  filter(term == "T_D")%>%
+  mutate(Type    = "H2.4",
+         Outcome = "rr_paz")
+
+tidy_2.2.4.5 <- tidy(model_2.2.4.5)%>%
+  filter(term == "T_D")%>%
+  mutate(Type    = "H2.4",
+         Outcome = "rr_edu")
+
+tidy_2.2.4.6 <- tidy(model_2.2.4.6)%>%
+  filter(term == "T_D")%>%
+  mutate(Type    = "H2.4",
+         Outcome = "rr_ncer")
+
+tidy_2.2.4.7 <- tidy(model_2.2.4.7)%>%
+  filter(term == "T_D")%>%
+  mutate(Type    = "H2.4",
+         Outcome = "rr_deforst")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_2.2.4.3, tidy_2.2.4.4, tidy_2.2.4.5, tidy_2.2.4.6, tidy_2.2.4.7)
+
+rm(data_2.2.4, model_2.2.4.1, model_2.2.4.2, model_2.2.4.3, model_2.2.4.4, model_2.2.4.5, model_2.2.4.6, model_2.2.4.7, tidy_2.2.4.3, tidy_2.2.4.4, tidy_2.2.4.5, tidy_2.2.4.6, tidy_2.2.4.7)
 
 data_2.2.4.D <- data_2 %>%
   filter(Group == "D")%>%
@@ -536,8 +661,23 @@ etable(model_3.3, tex = TRUE, dict = dict_latex,
        notes = c("\\medskip \\textit{Note:}",
                  paste0("This table displays results from an OLS regression on the unconditional and conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about fossil fuel subsidies, differentiated by whether respondets support the government or not.")))
 
-rm(model_3.3)
+model_3.3.1 <- feols(unconditional_prcl ~ treatment + Group, data = filter(data_3, Support == "Non-supporter"))
+model_3.3.2 <- feols(conditional ~ treatment + Group, data = filter(data_3, Support == "Non-supporter"))
 
+tidy_3.3.1 <- tidy(model_3.3.1)%>%
+  filter(term == "treatment")%>%
+  mutate(Type    = "H3",
+         Outcome = "Unconditional")
+
+tidy_3.3.2 <- tidy(model_3.3.2)%>%
+  filter(term == "treatment")%>%
+  mutate(Type    = "H3",
+         Outcome = "Conditional")
+
+hypotheses_0 <- hypotheses_0 %>%
+  bind_rows(tidy_3.3.1, tidy_3.3.2)
+
+rm(model_3.3, model_3.3.1, model_3.3.2, tidy_3.3.1, tidy_3.3.2)
 
 # 3.    Supplementary Analyses ####
 
@@ -1987,6 +2127,162 @@ dev.off()
 
 # 4.    Figures ####
 
+
+# 4.1   Descriptive statistics - part I ####
+
+# Questions on perception of FFSR and unconditional removal
+# Questions on climate policy (cc_imp_co2, cc_imp_pers, cc_imp_equit)
+
+# Over left and right
+
+data_4.1 <- data_1 %>%
+  select(unconditional_prcl, cc_imp_co2, cc_imp_pers, cc_imp_equit, derecho, yo_amnto, pobre_amnto, rica_amnto, grp_ingrso, izq_der)%>%
+  mutate(Position = ifelse(izq_der < 3, "Left", 
+                           ifelse(izq_der > 3, "Right",
+                                  ifelse(izq_der == 3, "Centrist", izq_der))))%>%
+  mutate(Income = ifelse(grp_ingrso < 3, "Lower",
+                         ifelse(grp_ingrso == 3, "Middle",
+                                ifelse(grp_ingrso > 3, "Higher", NA))))%>%
+  select(-grp_ingrso,-izq_der)%>%
+  mutate_at(vars(starts_with("cc_")), ~ ifelse(. > 3, "Important", "Not important"))%>%
+  mutate_at(vars(derecho:rica_amnto), ~ ifelse(. > 3, "Important", "Not important"))%>%
+  mutate(unconditional_prcl = ifelse(unconditional_prcl > 3, "Agree", "Not agree"))
+
+# Over all respondents
+
+data_4.1.1 <- data_4.1 %>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./nrow(data_4.1))%>%
+  mutate(Type = "Overall")
+  
+# Over all income groups
+
+data_4.1.2 <- data_4.1 %>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  group_by(Income)%>%
+  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
+  ungroup()%>%
+  left_join(summarise(group_by(data_4.1, Income),number = n()))%>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./number)%>%
+  select(-number)%>%
+  mutate(Type = "Income")%>%
+  rename(Type_1 = Income)
+
+# Over left and right
+
+data_4.1.3 <- data_4.1 %>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  filter(!is.na(Position))%>%
+  group_by(Position)%>%
+  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
+  ungroup()%>%
+  left_join(summarise(group_by(filter(data_4.1, !is.na(Position)), Position),number = n()))%>%
+  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./number)%>%
+  select(-number)%>%
+  mutate(Type = "Position")%>%
+  rename(Type_1 = Position)
+
+data_4.1.4 <- bind_rows(data_4.1.1, data_4.1.2, data_4.1.3)%>%
+  pivot_longer(unconditional_prcl:rica_amnto, names_to = "variable", values_to = "values")%>%
+  mutate(Type_1 = ifelse(is.na(Type_1),"",Type_1))%>%
+  mutate(Type = factor(Type, levels = c("Overall", "Income", "Position")),
+         Type_1 = factor(Type_1, levels = c("","Lower", "Middle", "Higher", "Left", "Centrist", "Right")))%>%
+  mutate(Variable = case_when(variable == "yo_amnto"     ~ "¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
+                              variable == "rica_amnto"   ~ "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+                              variable == "pobre_amnto"  ~ "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+                              variable == "derecho"      ~ "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
+                              variable == "cc_imp_pers"  ~ "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
+                              variable == "cc_imp_equit" ~ "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
+                              variable == "cc_imp_co2"   ~ "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
+                              variable == "unconditional_prcl" ~ "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?"))%>%
+  mutate(Variable = factor(Variable, levels = c("¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
+                                                "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
+                                                "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+                                                "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+                                                "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
+                                                "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
+                                                "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
+                                                "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?")))%>%
+  mutate(label = paste0(round(values*100,0),"%"))%>%
+  mutate(Type_2 = ifelse(Variable == "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?", "",
+                         ifelse(Variable %in% c("Los costos financieros de una política climática deben ser bajos para mí y mi hogar.","Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.","Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2."), "Climate policy", "Fossil fuel subsidy")))%>%
+  mutate(Type_2 = factor(Type_2, levels = c("Climate policy", "Fossil fuel subsidy", "")))
+
+levels(data_4.1.4$Variable) <- str_wrap(levels(data_4.1.4$Variable), width = 40)
+
+P_4.1 <- ggplot(data_4.1.4)+
+  geom_point(aes(x = Type_1, y = Variable, fill = values), shape = 22, size = 12)+
+  geom_text(aes(x = Type_1, y = Variable, label = label), size = 3)+
+  facet_grid(Type_2 ~ Type, scales = "free", space = "free", switch = "y")+
+  # scale_y_discrete(limits = rev(levels(data_4.1.4$Variable)))+
+  scale_x_discrete(position = "top")+
+  theme_minimal()+
+  scale_fill_distiller(limits = c(0,1), palette = "RdYlBu", direction = 1, guide = "none")+
+  theme(strip.placement = "outside",
+        axis.title = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text = element_text(size = 6),
+        panel.grid.major = element_blank(),
+        panel.border = element_rect(color = "black", fill = NA))
+
+jpeg("../Colombia_Survey_Experiment/Paper/Figures/2_Appendix/Figure_A1.jpg", width = 13, height = 10, unit = "cm", res = 600)
+print(P_4.1)
+dev.off()
+
+rm(data_4.1, data_4.1.1, data_4.1.2, data_4.1.3, data_4.1.4, P_4.1)
+
+# 4.2   Hypothesis testing ####
+
+hypotheses_1 <- hypotheses_0 %>%
+  mutate(conf_low  = estimate - std.error*1.96,
+         conf_high = estimate + std.error*1.96)%>%
+  mutate(Outcome = ifelse(is.na(Outcome), "Compensatory policy", Outcome))%>%
+  mutate(Outcome = ifelse(Outcome == "Conditional", "Conditional support",
+                          ifelse(Outcome == "Unconditional", "Unconditional support", Outcome)))%>%
+  mutate(Outcome = case_when(Outcome == "rr_lmpsm"    ~ "Uniform transfer",
+                             Outcome == "rr_pobre"    ~ "Targeted transfer (poor)",
+                             Outcome == "rr_afctds"   ~ "Targeted transfer (affected)",
+                             Outcome == "rr_impuesto" ~ "Tax reduction",
+                             Outcome == "rr_deuda"    ~ "Reduce public debt",
+                             Outcome == "rr_etransp"  ~ "Electric transport",
+                             Outcome == "rr_paz"      ~ "Road infrastructure",
+                             Outcome == "rr_edu"      ~ "Public education",
+                             Outcome == "rr_ncer"     ~ "Renewable energy",
+                             Outcome == "rr_deforst"  ~ "Reduce deforestation",
+                             .default = Outcome))%>%
+  mutate(Outcome = factor(Outcome, levels = c("Reduce deforestation","Renewable energy","Electric transport", "Public education","Road infrastructure",  "Reduce public debt",
+                                              "Tax reduction","Targeted transfer (affected)", "Targeted transfer (poor)", "Uniform transfer", "Conditional support", "Unconditional support", "Compensatory policy")))%>%
+  mutate(Type = ifelse(Type == "H2.1", "A",
+                       ifelse(Type == "H2.2", "B",
+                              ifelse(Type == "H2.3", "C",
+                                     ifelse(Type == "H2.4", "D", Type)))))%>%
+  mutate(Type = factor(Type, levels = c("H1", "H2", "A", "B", "C", "D", "H3")))%>%
+  mutate(Type_2 = ifelse(Outcome %in% c("Targeted transfer (affected)", "Targeted transfer (poor)", "Uniform transfer", "Tax reduction"), "Social protection",
+                         ifelse(Outcome %in% c("Reduce public debt", "Road infrastructure", "Public education"), "Public goods",
+                                ifelse(Outcome %in% c("Electric transport", "Renewable energy", "Reduce deforestation"), "Green spending", "Rest"))))%>%
+  mutate(Type_2 = factor(Type_2, levels = c("Social protection", "Public goods", "Green spending", "Rest")))
+
+P_4.2 <- ggplot(hypotheses_1)+
+  geom_vline(aes(xintercept = 0))+
+  facet_grid(Type ~ ., scales = "free_y", space = "free_y", switch = "y")+
+  geom_errorbar(aes(xmin = conf_low, xmax = conf_high, y = Outcome), width = 0.5)+
+  geom_point(aes(x = estimate, y = Outcome, fill = Type_2), shape = 22, size = 4, colour = "black", stroke = 0.5)+
+  theme_bw()+
+  xlab("Estimate")+
+  scale_fill_manual(breaks = c("Social protection", "Public goods", "Green spending"), name = "Category",
+                    values = c("#BC3C29FF", "#E18727FF", "#0072B5FF", "grey"))+
+  theme(strip.placement = "outside",
+        axis.title.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_text(size = 7),
+        axis.text.x = element_text(size = 8),
+        panel.border = element_rect(color = "black", fill = NA),
+        legend.position = "bottom")
+
+jpeg("../Colombia_Survey_Experiment/Paper/Figures/2_Appendix/Figure_A2.jpg", width = 15.5, height = 20, unit = "cm", res = 600)
+print(P_4.2)
+dev.off()
 
 # 5.    Descriptive statistics / ML-support ####
 
