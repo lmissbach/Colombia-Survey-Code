@@ -17,6 +17,8 @@ predictions     <- read_csv("../2_Predictions/Colombia 65/Predictions_Synthetic_
 
 #quantile(read_csv("../Colombia EXP/Predictions_Entire_Dataset_expenditures.csv")$.pred, prob = 0.5)  # Median costs: 10,802,917
 
+UR_data <- read.xlsx("Urb_Rur_CEDE_150425.xlsx")
+
 # 1.    Renaming and cleaning (TBD) ####
 
 # Update later
@@ -24,6 +26,10 @@ predictions     <- read_csv("../2_Predictions/Colombia 65/Predictions_Synthetic_
 # data_0 <- read_sav("../Paper_Colombia_Experiment/Analysis/Inputs/Intermediate.sav")
 
 data_0 <- read_sav("../X_Paper_Colombia_Experiment/Analysis/Outputs/Intermediate.sav")
+
+UR_data_1 <- UR_data %>%
+  mutate(urban_01 = ifelse(indrural <= 0.5,1,0))%>%
+  select(municipio, depto, urban_01)
 
 # Basic data transformation
 data_1 <- data_0 %>%
@@ -34,7 +40,12 @@ data_1 <- data_0 %>%
          unconditional_prcl_recode_2       = ffsr_prcl_recode_2,
          unconditional_prcl_recode_2extrem = ffsr_prcl_recode_2extrem,
          unconditional_prcl_recode_3       = ffsr_prcl_recode_3)%>%
-  mutate(treatment = ifelse(rowSums(.[, grepl("^T_", names(.))] == 1) > 0, 1, 0))
+  mutate(treatment = ifelse(rowSums(.[, grepl("^T_", names(.))] == 1) > 0, 1, 0))%>%
+  mutate(municipio = haven::as_factor(mncp),
+         depto     = haven::as_factor(dept))%>%
+  left_join(UR_data_1)
+
+rm(UR_data_1)
 
 data_1.1.1 <- data_1 %>%
   select(ID, conditional, conditional_recode_2, conditional_recode_2extrem, conditional_recode_3)%>%
@@ -2126,8 +2137,6 @@ print(P_13)
 dev.off()
 
 # 4.    Figures ####
-
-
 # 4.1   Descriptive statistics - part I ####
 
 # Questions on perception of FFSR and unconditional removal
@@ -2136,7 +2145,8 @@ dev.off()
 # Over left and right
 
 data_4.1 <- data_1 %>%
-  select(unconditional_prcl, cc_imp_co2, cc_imp_pers, cc_imp_equit, derecho, yo_amnto, pobre_amnto, rica_amnto, grp_ingrso, izq_der)%>%
+  select(unconditional_prcl, conditional, cc_imp_co2, cc_imp_pers, cc_imp_equit, derecho, yo_amnto, pobre_amnto, rica_amnto, grp_ingrso, izq_der,
+         rr_lmpsm:rr_deforst)%>%
   mutate(Position = ifelse(izq_der < 3, "Left", 
                            ifelse(izq_der > 3, "Right",
                                   ifelse(izq_der == 3, "Centrist", izq_der))))%>%
@@ -2146,25 +2156,27 @@ data_4.1 <- data_1 %>%
   select(-grp_ingrso,-izq_der)%>%
   mutate_at(vars(starts_with("cc_")), ~ ifelse(. > 3, "Important", "Not important"))%>%
   mutate_at(vars(derecho:rica_amnto), ~ ifelse(. > 3, "Important", "Not important"))%>%
-  mutate(unconditional_prcl = ifelse(unconditional_prcl > 3, "Agree", "Not agree"))
+  mutate(unconditional_prcl = ifelse(unconditional_prcl > 3, "Agree", "Not agree"))%>%
+  mutate(conditional        = ifelse(conditional > 3, "Agree", "Not agree"))%>%
+  mutate_at(vars(starts_with("rr_")), ~ ifelse(. > 3, "Agree", "Not agree"))
 
 # Over all respondents
 
 data_4.1.1 <- data_4.1 %>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
-  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./nrow(data_4.1))%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  summarise_at(vars(unconditional_prcl:rr_deforst), ~ sum(.))%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ./nrow(data_4.1))%>%
   mutate(Type = "Overall")
   
 # Over all income groups
 
 data_4.1.2 <- data_4.1 %>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
   group_by(Income)%>%
-  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
+  summarise_at(vars(unconditional_prcl:rr_deforst), ~ sum(.))%>%
   ungroup()%>%
   left_join(summarise(group_by(data_4.1, Income),number = n()))%>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./number)%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ./number)%>%
   select(-number)%>%
   mutate(Type = "Income")%>%
   rename(Type_1 = Income)
@@ -2172,53 +2184,106 @@ data_4.1.2 <- data_4.1 %>%
 # Over left and right
 
 data_4.1.3 <- data_4.1 %>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ifelse(. %in% c("Important", "Agree"),1,0))%>%
   filter(!is.na(Position))%>%
   group_by(Position)%>%
-  summarise_at(vars(unconditional_prcl:rica_amnto), ~ sum(.))%>%
+  summarise_at(vars(unconditional_prcl:rr_deforst), ~ sum(.))%>%
   ungroup()%>%
   left_join(summarise(group_by(filter(data_4.1, !is.na(Position)), Position),number = n()))%>%
-  mutate_at(vars(unconditional_prcl:rica_amnto), ~ ./number)%>%
+  mutate_at(vars(unconditional_prcl:rr_deforst), ~ ./number)%>%
   select(-number)%>%
   mutate(Type = "Position")%>%
   rename(Type_1 = Position)
 
 data_4.1.4 <- bind_rows(data_4.1.1, data_4.1.2, data_4.1.3)%>%
-  pivot_longer(unconditional_prcl:rica_amnto, names_to = "variable", values_to = "values")%>%
+  pivot_longer(unconditional_prcl:rr_deforst, names_to = "variable", values_to = "values")%>%
   mutate(Type_1 = ifelse(is.na(Type_1),"",Type_1))%>%
   mutate(Type = factor(Type, levels = c("Overall", "Income", "Position")),
          Type_1 = factor(Type_1, levels = c("","Lower", "Middle", "Higher", "Left", "Centrist", "Right")))%>%
-  mutate(Variable = case_when(variable == "yo_amnto"     ~ "¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
-                              variable == "rica_amnto"   ~ "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
-                              variable == "pobre_amnto"  ~ "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
-                              variable == "derecho"      ~ "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
-                              variable == "cc_imp_pers"  ~ "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
-                              variable == "cc_imp_equit" ~ "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
-                              variable == "cc_imp_co2"   ~ "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
-                              variable == "unconditional_prcl" ~ "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?"))%>%
-  mutate(Variable = factor(Variable, levels = c("¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
-                                                "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
-                                                "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
-                                                "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
-                                                "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
-                                                "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
-                                                "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
-                                                "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?")))%>%
+  mutate(Variable = case_when(variable == "yo_amnto"     ~ "Concern about personal impact from 65% fuel price hike",
+                             variable == "rica_amnto"   ~ "Concern about high-income HH impact from 65% fuel price hike",
+                             variable == "pobre_amnto"  ~ "Concern about low-income HH impact from 65% fuel price hike",
+                             variable == "derecho"      ~ "Right to benefit from fuel subsidies",
+                             variable == "cc_imp_pers"  ~ "Climate policy costs should be low for me and my HH.",
+                             variable == "cc_imp_equit" ~ "Climate policy costs should be equally distributed across HH.",
+                             variable == "cc_imp_co2"   ~ "Climate policy should primarily reduce CO2.",
+                             variable == "unconditional_prcl" ~ "Unconditional support: FFSR despite 65% price increase",
+                             variable == "conditional" ~ "Conditional support: FFSR despite 65% prince increase",
+                             variable == "rr_lmpsm"    ~ "Equal cash transfers to all HH",
+                             variable == "rr_pobre"    ~ "Cash transfers to poor HH",
+                             variable == "rr_afctds"   ~ "Cash transfers to most affected HH",
+                             variable == "rr_impuesto" ~ "Reduce public debt",
+                             variable == "rr_deuda"    ~ "Reduce personal income taxes",
+                             variable == "rr_etransp"  ~ "Invest in electric transport (e-buses or e-cars)",
+                             variable == "rr_paz"      ~ "Improve rural roads",
+                             variable == "rr_edu"      ~ "Improve education",
+                             variable == "rr_ncer"     ~ "Invest in clean energy",
+                             variable == "rr_deforst"  ~ "Protect the Amazon rainforest",))%>%
+  mutate(Variable = factor(Variable, levels = c("Concern about high-income HH impact from 65% fuel price hike",
+                                                "Concern about low-income HH impact from 65% fuel price hike",
+                                                "Concern about personal impact from 65% fuel price hike",
+                                                "Right to benefit from fuel subsidies",
+                                                "Climate policy costs should be equally distributed across HH.",
+                                                "Climate policy costs should be low for me and my HH.",
+                                                "Climate policy should primarily reduce CO2.",
+                                                "Conditional support: FFSR despite 65% prince increase",
+                                                "Unconditional support: FFSR despite 65% price increase",
+                                                "Protect the Amazon rainforest",
+                                                "Invest in clean energy",
+                                                "Improve education",
+                                                "Improve rural roads",
+                                                "Invest in electric transport (e-buses or e-cars)",
+                                                "Reduce personal income taxes",
+                                                "Reduce public debt",
+                                                "Cash transfers to most affected HH",
+                                                "Cash transfers to poor HH",
+                                                "Equal cash transfers to all HH")))%>%
+
+  
+  # mutate(Variable = case_when(variable == "yo_amnto"     ~ "¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
+  #                             variable == "rica_amnto"   ~ "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+  #                             variable == "pobre_amnto"  ~ "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+  #                             variable == "derecho"      ~ "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
+  #                             variable == "cc_imp_pers"  ~ "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
+  #                             variable == "cc_imp_equit" ~ "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
+  #                             variable == "cc_imp_co2"   ~ "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
+  #                             variable == "unconditional_prcl" ~ "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?"))%>%
+  # mutate(Variable = factor(Variable, levels = c("¿Qué tanto considera que le afectaría un aumento de los precios de los combustibles de un 65 %?",
+  #                                               "¿Qué tanto considera que su hogar tiene derecho a beneficiarse de los subsidios a los combustibles?",
+  #                                               "¿Qué tanto le preocupan los efectos causados a las personas de bajos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+  #                                               "¿Qué tanto le preocupan los efectos causados a las personas de altos ingresos por un posible aumento de los precios de los combustibles en el 65 %?",
+  #                                               "Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2.",
+  #                                               "Los costos financieros de una política climática deben ser bajos para mí y mi hogar.",
+  #                                               "Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.",
+  #                                               "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?")))%>%
   mutate(label = paste0(round(values*100,0),"%"))%>%
-  mutate(Type_2 = ifelse(Variable == "El gobierno de Colombia debe REDUCIR PARCIALMENTE los subsidios a los combustibles (gasolina y diésel/ACPM) a pesar de que reducir los subsidios haga subir los precios de estos en un 65 %?", "",
-                         ifelse(Variable %in% c("Los costos financieros de una política climática deben ser bajos para mí y mi hogar.","Los costos financieros de una política climática deben distribuirse equitativamente entre todos los hogares.","Una política de lucha contra el cambio climático debería principalmente reducir las emisiones de CO2."), "Climate policy", "Fossil fuel subsidy")))%>%
-  mutate(Type_2 = factor(Type_2, levels = c("Climate policy", "Fossil fuel subsidy", "")))
+  mutate(Type_2 = ifelse(Variable == "Unconditional support: FFSR despite 65% price increase" | Variable == "Conditional support: FFSR despite 65% prince increase", "",
+                         ifelse(Variable %in% c("Climate policy costs should be low for me and my HH.",
+                                                "Climate policy costs should be equally distributed across HH.",
+                                                "Climate policy should primarily reduce CO2."), "Climate policy", 
+                                ifelse(Variable %in% c("Protect the Amazon rainforest",
+                                                       "Invest in clean energy",
+                                                       "Improve education",
+                                                       "Improve rural roads",
+                                                       "Invest in electric transport (e-buses or e-cars)",
+                                                       "Reduce personal income taxes",
+                                                       "Reduce public debt",
+                                                       "Cash transfers to most affected HH",
+                                                       "Cash transfers to poor HH",
+                                                       "Equal cash transfers to all HH",
+                                                       "Conditional support: FFSR despite 65% prince increase"), "Conditional support", "Fossil fuel subsidy"))))%>%
+  mutate(Type_2 = factor(Type_2, levels = c("Climate policy", "Fossil fuel subsidy", "", "Conditional support")))
 
 levels(data_4.1.4$Variable) <- str_wrap(levels(data_4.1.4$Variable), width = 40)
 
-P_4.1 <- ggplot(data_4.1.4)+
-  geom_point(aes(x = Type_1, y = Variable, fill = values), shape = 22, size = 12)+
-  geom_text(aes(x = Type_1, y = Variable, label = label), size = 3)+
+P_4.1 <- ggplot(filter(data_4.1.4, Type_2 != "Conditional support"))+
+  geom_point(aes(x = Type_1, y = Variable, fill = values), shape = 22, size = 10)+
+  geom_text(aes(x = Type_1, y = Variable, label = label), size = 2.8)+
   facet_grid(Type_2 ~ Type, scales = "free", space = "free", switch = "y")+
   # scale_y_discrete(limits = rev(levels(data_4.1.4$Variable)))+
   scale_x_discrete(position = "top")+
   theme_minimal()+
-  scale_fill_distiller(limits = c(0,1), palette = "RdYlBu", direction = 1, guide = "none")+
+  scale_fill_distiller(limits = c(0.2,1), palette = "RdYlGn", direction = 1, guide = "none")+
   theme(strip.placement = "outside",
         axis.title = element_blank(),
         axis.ticks.x = element_blank(),
@@ -2226,8 +2291,24 @@ P_4.1 <- ggplot(data_4.1.4)+
         panel.grid.major = element_blank(),
         panel.border = element_rect(color = "black", fill = NA))
 
-jpeg("../Colombia_Survey_Experiment/Paper/Figures/2_Appendix/Figure_A1.jpg", width = 13, height = 10, unit = "cm", res = 600)
+P_4.2 <- ggplot(filter(data_4.1.4, Type_2 == "Conditional support"))+
+  geom_point(aes(x = Type_1, y = Variable, fill = values), shape = 22, size = 10)+
+  geom_text(aes(x = Type_1, y = Variable, label = label), size = 2.8)+
+  facet_grid(Type_2 ~ Type, scales = "free", space = "free", switch = "y")+
+  # scale_y_discrete(limits = rev(levels(data_4.1.4$Variable)))+
+  scale_x_discrete(position = "top")+
+  theme_minimal()+
+  scale_fill_distiller(limits = c(0.2,1), palette = "RdYlGn", direction = 1, guide = "none")+
+  theme(strip.placement = "outside",
+        axis.title = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text = element_text(size = 6),
+        panel.grid.major = element_blank(),
+        panel.border = element_rect(color = "black", fill = NA))
+
+jpeg("../Colombia_Survey_Experiment/Paper/Figures/2_Appendix/Figure_A1_%d.jpg", width = 13, height = 10, unit = "cm", res = 600)
 print(P_4.1)
+print(P_4.2)
 dev.off()
 
 rm(data_4.1, data_4.1.1, data_4.1.2, data_4.1.3, data_4.1.4, P_4.1)
@@ -2275,8 +2356,8 @@ P_4.2 <- ggplot(hypotheses_1)+
   theme(strip.placement = "outside",
         axis.title.y = element_blank(),
         axis.ticks.x = element_blank(),
-        axis.text.y = element_text(size = 7),
-        axis.text.x = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(size = 9),
         panel.border = element_rect(color = "black", fill = NA),
         legend.position = "bottom")
 
