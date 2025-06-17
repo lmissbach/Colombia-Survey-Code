@@ -384,16 +384,36 @@ hypotheses_0 <- hypotheses_0 %>%
 
 rm(data_2.2.1, model_2.2.1.1, model_2.2.1.2, model_2.2.1.3, model_2.2.1.4, tidy_2.2.1.3, tidy_2.2.1.4)
 
-# Including attention check
+# Including first stage question
 
-data_2.2.1.A <- data_2 %>%
-  filter(Group == "A")%>%
-  #filter(frst_a == 1)
-  filter(frst_a == 1 | C_A == 1)
+data_2.2.1.A <- data_2.2.1 %>%
+  # Exclude wrong treatment group participants
+  filter(treatment == 0 | frst_a == 1)
 
-model_2.2.1.A <- feols(c(rr_pobre, rr_afctds, rr_deuda) ~ T_A,  data = data_2.2.1.A)
+model_2.2.1.1.A <- feols(c(rr_lmpsm, rr_pobre, rr_afctds, rr_impuesto, rr_deuda) ~ T_A,  data = data_2.2.1.A)
+model_2.2.1.2.A <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_A,  data = data_2.2.1.A)
 
-rm(data_2.2.1.A, model_2.2.1.A)
+etable(model_2.2.1.1.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.1.1_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.1: Conditional support for a partial fossil fuel subsidy reform (Treatment A - part I)",  
+       label = "tab:H2.1.1", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about respondent-specific personal financial effects from a partial fossil fuel subsidy reform.")))
+
+etable(model_2.2.1.2.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.1.2_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.1: Conditional support for a partial fossil fuel subsidy reform (Treatment A - part II)",  
+       label = "tab:H2.1.2", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about respondent-specific personal financial effects from a partial fossil fuel subsidy reform.")))
+
+rm(data_2.2.1.A, model_2.2.1.1.A, model_2.2.1.2.A)
 
 # Including splitting by being more or less affected than the median.
 
@@ -469,15 +489,34 @@ rm(data_2.2.2, model_2.2.2.1, model_2.2.2.2, model_2.2.2.3, model_2.2.2.4, tidy_
 
 # Including attention check
 
-data_2.2.2.B <- data_2 %>%
-  filter(Group == "B")%>%
-  mutate(FRST_B = ifelse(frst_b %in% c(3,4,5), "Correct", "Not correct"))%>%
-  #filter(FRST_B == "Correct")
-  filter(FRST_B == "Correct" | C_B == 1)
+data_2.2.2.A <- data_2.2.2 %>%
+  # Exclude wrong treatment group participants
+  filter(treatment == 0 | frst_b %in% c(3,4,5))
 
-model_2.2.2.B <- feols(c(rr_pobre, rr_afctds, rr_deuda) ~ T_B,  data = data_2.2.2.B)
+model_2.2.2.1.A <- feols(c(rr_lmpsm, rr_pobre, rr_afctds, rr_impuesto, rr_deuda) ~ T_B,  data = data_2.2.2.A)
+model_2.2.2.2.A <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_B,  data = data_2.2.2.A)
 
-rm(data_2.2.2.B, model_2.2.2.B)
+etable(model_2.2.2.1.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.2.1_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.2: Conditional support for a partial fossil fuel subsidy reform (Treatment B - part I)",  
+       label = "tab:H2.2.1", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the distributional effects from a partial fossil fuel subsidy reform.")))
+
+etable(model_2.2.2.2.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.2.2_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.2: Conditional support for a partial fossil fuel subsidy reform (Treatment B - part II)",  
+       label = "tab:H2.2.2", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the distributional effects from a partial fossil fuel subsidy reform.")))
+
+rm(data_2.2.2.A, model_2.2.2.1.A, model_2.2.2.2.A)
 
 # 2.2.3 H2.3 ####
 
@@ -545,15 +584,33 @@ rm(data_2.2.3, model_2.2.3.1, model_2.2.3.2, model_2.2.3.3, model_2.2.3.4, model
 
 # Including attention check
 
-data_2.2.3.C <- data_2 %>%
-  filter(Group == "C")%>%
-  mutate(FRST_C = ifelse(frst_c %in% c(3,4,5), "Correct", "Not correct"))%>%
-  filter(FRST_C == "Correct")
-  filter(FRST_C == "Correct" | C_C == 1)
+data_2.2.3.A <- data_2.2.3 %>%
+  filter(treatment == 0 | frst_c %in% c(3,4,5))
 
-model_2.2.3.C <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_C,  data = data_2.2.3.C)
+model_2.2.3.1.A <- feols(c(rr_lmpsm, rr_pobre, rr_afctds, rr_impuesto, rr_deuda) ~ T_C,  data = data_2.2.3.A)
+model_2.2.3.2.A <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_C,  data = data_2.2.3.A)
 
-rm(data_2.2.3.C, model_2.2.3.C)
+etable(model_2.2.3.1.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.3.1_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.3: Conditional support for a partial fossil fuel subsidy reform (Treatment C - part I)",  
+       label = "tab:H2.3.1", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the efficiency of government resource use.")))
+
+etable(model_2.2.3.2.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.3.2_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.3: Conditional support for a partial fossil fuel subsidy reform (Treatment C - part II)",  
+       label = "tab:H2.3.2", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the efficiency of government resource use.")))
+
+rm(data_2.2.3.A, model_2.2.3.1.A, model_2.2.3.2.A)
 
 # 2.2.4 H2.4 ####
 
@@ -619,15 +676,33 @@ hypotheses_0 <- hypotheses_0 %>%
 
 rm(data_2.2.4, model_2.2.4.1, model_2.2.4.2, model_2.2.4.3, model_2.2.4.4, model_2.2.4.5, model_2.2.4.6, model_2.2.4.7, tidy_2.2.4.3, tidy_2.2.4.4, tidy_2.2.4.5, tidy_2.2.4.6, tidy_2.2.4.7)
 
-data_2.2.4.D <- data_2 %>%
-  filter(Group == "D")%>%
-  mutate(FRST_D = ifelse(frst_d %in% c(3,4,5), "Correct", "Not correct"))%>%
-  filter(FRST_D == "Correct")
-  filter(FRST_D == "Correct" | C_D == 1)
+data_2.2.4.A <- data_2.2.4 %>%
+  filter(treatment == 0 | frst_d %in% c(3,4,5))
 
-model_2.2.4.D <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_D,  data = data_2.2.4.D)
+model_2.2.4.1.A <- feols(c(rr_lmpsm, rr_pobre, rr_afctds, rr_impuesto, rr_deuda) ~ T_D,  data = data_2.2.4.A)
+model_2.2.4.2.A <- feols(c(rr_etransp, rr_paz, rr_edu, rr_ncer, rr_deforst) ~ T_D,  data = data_2.2.4.A)
 
-rm(data_2.2.4.D, model_2.2.4.D)
+etable(model_2.2.4.1.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.4.1_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.4: Conditional support for a partial fossil fuel subsidy reform (Treatment D - part I)",  
+       label = "tab:H2.4.1", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the environmental consequences of fossil fuel subsidies.")))
+
+etable(model_2.2.4.2.A, tex = TRUE, dict = dict_latex,
+       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.4.2_Attention.tex", fitstat = c("n", "r2"),
+       digits = 3, digits.stats = 2, replace = TRUE,  style.tex = tex.style, se.row = TRUE, tpt = TRUE,
+       title = "Hypothesis 2.4: Conditional support for a partial fossil fuel subsidy reform (Treatment D - part II)",  
+       label = "tab:H2.4.2", 
+       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
+       placement = "htbp!", order = c("(Intercept)","Treatment","Group", "Control"),
+       notes = c("\\medskip \\textit{Note:}",
+                 paste0("This table displays results from an OLS regression on the conditional support for a partial fossil fuel subsidy reform over whether respondents received additional information about the environmental consequences of fossil fuel subsidies.")))
+
+rm(data_2.2.4.A, model_2.2.4.1.A, model_2.2.4.2.A)
 
 # 2.3   H3 ####
 
