@@ -18,7 +18,7 @@ predictions     <- read_csv("../2_Predictions/Colombia 65/Predictions_Synthetic_
 #quantile(read_csv("../Colombia EXP/Predictions_Entire_Dataset_expenditures.csv")$.pred, prob = 0.5)  # Median costs: 10,802,917
 
 UR_data <- read.xlsx("Urb_Rur_CEDE_150425.xlsx")
-
+Provinces <- read.xlsx("Provinces_Regions.xlsx")
 # 1.    Renaming and cleaning (TBD) ####
 
 # Update later
@@ -43,9 +43,10 @@ data_1 <- data_0 %>%
   mutate(treatment = ifelse(rowSums(.[, grepl("^T_", names(.))] == 1) > 0, 1, 0))%>%
   mutate(municipio = haven::as_factor(mncp),
          depto     = haven::as_factor(dept))%>%
-  left_join(UR_data_1)
+  left_join(UR_data_1)%>%
+  left_join(Provinces, by = c("depto" = "labels"))
 
-rm(UR_data_1)
+rm(UR_data_1, UR_data, Provinces)
 
 data_1.1.1 <- data_1 %>%
   select(ID, conditional, conditional_recode_2, conditional_recode_2extrem, conditional_recode_3)%>%
@@ -2734,6 +2735,113 @@ rm(cw_accuracy, data_5, data_5.2.test, data_5.2.testing, data_5.2.train, data_5.
 
 # 5.3   Descriptive statistics in general ####
 
+
+
+# 6     Specification charts ####
+
+data_6 <- data_1 %>%
+  select(ID,edad, gnro, etnia, Province, edu, ingrso, grp_ingrso, moto, carro, transpub, ccnr, cc_info, cc_preocup, cc_econ,
+         cc_imp_co2, cc_imp_pers, cc_imp_equit, pol_pres, izq_der, prop_acrd_fepc, prop_acrd_paz, prop_acrd_energ,
+         pais_gnrl, pais_confianza_army, pais_confianza_police, pais_confianza_prsdnt, pais_dmcrc, pais_econ,
+         ffsr_gnrl, ffsr_dsl, ffsr_gas, benefic, derecho, yo_amnto, pobre_amnto, rica_amnto, conditional, unconditional_prcl,
+         T_A:T_D, C_A:C_D, treatment)%>%
+  mutate(Group = ifelse(T_A == 1 | C_A == 1, "A",
+                        ifelse(T_B == 1 | C_B == 1, "B",
+                               ifelse(T_C == 1 | C_C == 1, "C",
+                                      ifelse(T_D == 1 | C_D == 1, "D", "Control")))))%>%
+  mutate(Group = factor(Group, level = c("Control", "A", "B", "C", "D")))%>%
+  select(-(T_A:C_D))%>%
+  # Individual adjustment and change to factor
+  mutate(edad  = factor(binning(edad, bins = 3, method = "quantile"), labels = c("18-36", "37-55", "56-95")),
+         etnia = factor(ifelse(etnia == 1, "Indigeneous",
+                                      ifelse(etnia == 5, "Afro-Colombian", "None and other"))),
+         #dept
+         edu = factor(ifelse(edu < 3, "Primary or none",
+                             ifelse(edu < 5, "Secondary or technial", "University or postgraduate"))),
+         ingrso = factor(ifelse(ingrso < 4, "Between 0 - 900,000 COP",
+                                ifelse(ingrso < 8, "Between 900,001 - 1,825,000 COP", "More than 1,825,001 COP"))),
+         grp_ingrso = factor(ifelse(grp_ingrso < 3, "Low and lower-middle",
+                                    ifelse(grp_ingrso < 4, "Middle", "Upper-middle and high"))),
+         ccnr = factor(ifelse(ccnr == 1, "Electricity",
+                              ifelse(ccnr < 5, "Natural gas and liquid fuels", "Solid fuels"))),
+         cc_info = factor(ifelse(cc_info < 3, "Not informed",
+                                 ifelse(cc_info == 3, "NA", "Informed"))),
+         cc_preocup = factor(ifelse(cc_preocup < 3, "Not worried",
+                                    ifelse(cc_preocup == 3, "NA", "Informed"))),
+         cc_econ = factor(ifelse(cc_econ == 2, "Priority to economcy",
+                                 ifelse(cc_econ == 5, "Priority to climate change",
+                                        ifelse(cc_econ == 4, "Equal priority", "NA")))),
+         pol_pres = factor(ifelse(pol_pres == 1, "G Petro",
+                                  ifelse(pol_pres > 3, "NA", "Not Petro"))),
+         izq_der = factor(ifelse(izq_der < 2, "Derecha",
+                                 ifelse(izq_der == 3, "Centrista",
+                                        ifelse(izq_der == 4 | izq_der == 5, "Izquierda", "NA")))))%>%
+  mutate_at(vars(cc_imp_co2, cc_imp_pers, cc_imp_equit), 
+            ~ factor(ifelse(. < 3, "Disagree", ifelse(. == 3, "Neutral", "Agree"))))%>%
+  mutate_at(vars(pais_confianza_army, pais_confianza_police, pais_confianza_prsdnt), 
+            ~ factor(ifelse(. < 3, "Low trust", ifelse(. == 3, "Moderate trust", "High trust"))))%>%
+  mutate_at(vars(pais_dmcrc, pais_econ), ~ factor(ifelse(. < 3, "Bad",
+                                                         ifelse(. > 3, "Good", "NA"))))%>%
+  mutate_at(vars(benefic, derecho, yo_amnto, pobre_amnto, rica_amnto), 
+            ~ factor(ifelse(. < 3, "Little to nothing",
+                            ifelse(. > 3, "Somewhat to greatly", "NA"))))%>%
+  # Convert to factors
+  mutate_at(vars(gnro, moto:transpub, prop_acrd_fepc:prop_acrd_energ, pais_gnrl, Province),
+            ~ haven::as_factor(.))%>%
+  mutate(ffsr_dsl = ifelse(is.na(ffsr_dsl), ffsr_gnrl, ffsr_dsl),
+         ffsr_gas = ifelse(is.na(ffsr_gas), ffsr_gnrl, ffsr_gas))%>%
+  mutate_at(vars(ffsr_dsl, ffsr_gas), ~ factor(., labels = c("Yes", "I don't know", "No")))%>%
+  mutate(ffsr_gnrl = haven::as_factor(ffsr_gnrl))%>%
+  select(ID, Group, treatment, conditional, unconditional_prcl, everything())
+
+# 6.1   H1 ####
+
+data_6.1 <- data_6 %>%
+  pivot_longer(c(conditional, unconditional_prcl), values_to = "support", names_to = "Type")%>%
+  mutate(conditional = ifelse(Type == "conditional",1,0))
+
+data_6.1.0 <- data.frame()
+
+for(var_0 in c("edad", "gnro")){
+  # Delete observations first
+  
+  data_6.1.1 <- data_6.1 %>%
+    rename(var_interest = any_of(var_0))
+  
+  if(var_0 == "gnro"){
+    data_6.1.1 <- filter(data_6.1.1, gnro != "Other")
+  }
+  
+
+  model <- feols(support ~ conditional | ID, data = data_6.1.1, split = ~ var_interest)
+  
+  summary_model <- summary(model)
+  
+  data_6.1.2 <- data.frame()
+  
+  for(i in 1:length(summary_model)){
+    
+    data_6.1.2.1 <- data.frame(number = i,
+                               name   = names(model)[i],
+                               coefficient = unname(summary(model[[i]])$coefficients),
+                               std_error   = unname(summary(model[[i]])$se)) 
+    
+    data_6.1.2 <- data_6.1.2 %>%
+      bind_rows(data_6.1.2.1)
+    
+  }
+  
+  data_6.1.2 <- data_6.1.2 %>%
+    mutate(Term = var_0)%>%
+    select(Term, everything())
+  
+  data_6.1.0 <- data_6.1.0 %>%
+    bind_rows(data_6.1.2)
+    
+}
+
+
+# 6.2   H2 ####
 
 # 9.    Tests ####
 
