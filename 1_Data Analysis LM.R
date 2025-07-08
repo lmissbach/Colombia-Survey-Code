@@ -2828,9 +2828,7 @@ data_6 <- data_1 %>%
   select(-(T_A:C_D))%>%
   # Individual adjustment and change to factor
   mutate(edad  = factor(binning(edad, bins = 3, method = "quantile"), labels = c("18-36", "37-55", "56-95")),
-         etnia = factor(ifelse(etnia == 1, "Indigeneous",
-                                      ifelse(etnia == 5, "Afro-Colombian", "None and other"))),
-         #dept
+         etnia = factor(ifelse(etnia == 6, "White", "Non-white")),
          edu = factor(ifelse(edu < 3, "Primary or none",
                              ifelse(edu < 5, "Secondary or technial", "University or postgraduate"))),
          ingrso = factor(ifelse(ingrso < 4, "Between 0 - 900,000 COP",
@@ -2875,19 +2873,50 @@ data_6.1 <- data_6 %>%
   pivot_longer(c(conditional, unconditional_prcl), values_to = "support", names_to = "Type")%>%
   mutate(conditional = ifelse(Type == "conditional",1,0))
 
+# to be included: frst_a, frst_b, frst_c, frst_d
+# ffsr_mnt, ffsr_prcl, ffsr_complet for H2
+
 data_6.1.0 <- data.frame()
 
-for(var_0 in c("edad", "gnro")){
+colnames_0 <- colnames(select(data_6, -c(ID:unconditional_prcl)))
+
+for(var_0 in colnames_0){
+  print(var_0)
   # Delete observations first
   
-  data_6.1.1 <- data_6.1 %>%
+  data_6.1.1 <- data_6.1
+  
+  if(var_0 == "gnro")                 {data_6.1.1 <- filter(data_6.1.1, gnro != "Other")}
+  if(var_0 == "cc_info")              {data_6.1.1 <- filter(data_6.1.1, cc_info != "NA")}
+  if(var_0 == "cc_preocup")           {data_6.1.1 <- filter(data_6.1.1, cc_preocup != "NA")}
+  if(var_0 == "cc_econ")              {data_6.1.1 <- filter(data_6.1.1, cc_econ != "NA")}
+  if(var_0 == "cc_imp_co2")           {data_6.1.1 <- filter(data_6.1.1, cc_imp_co2 != "Neutral")}
+  if(var_0 == "cc_imp_pers")          {data_6.1.1 <- filter(data_6.1.1, cc_imp_pers != "Neutral")}
+  if(var_0 == "cc_imp_equit")         {data_6.1.1 <- filter(data_6.1.1, cc_imp_equit != "Neutral")}
+  if(var_0 == "pol_pres")             {data_6.1.1 <- filter(data_6.1.1, pol_pres != "NA")}
+  if(var_0 == "izq_der")              {data_6.1.1 <- filter(data_6.1.1, izq_der != "NA" & !is.na(izq_der))}
+  if(var_0 == "pais_confianza_army")  {data_6.1.1 <- filter(data_6.1.1, pais_confianza_army != "Moderate trust")}
+  if(var_0 == "pais_confianza_police"){data_6.1.1 <- filter(data_6.1.1, pais_confianza_police != "Moderate trust")}
+  if(var_0 == "pais_confianza_prsdnt"){data_6.1.1 <- filter(data_6.1.1, pais_confianza_prsdnt != "Moderate trust")}
+  if(var_0 == "prop_acrd_fepc")       {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_fepc))}
+  if(var_0 == "prop_acrd_paz")        {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_paz))}
+  if(var_0 == "prop_acrd_energ")      {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_energ))}
+  if(var_0 == "pais_gnrl")            {data_6.1.1 <- filter(data_6.1.1, !is.na(pais_gnrl))}
+  if(var_0 == "pais_dmcrc")           {data_6.1.1 <- filter(data_6.1.1, pais_dmcrc != "NA")}
+  if(var_0 == "pais_econ")            {data_6.1.1 <- filter(data_6.1.1, pais_econ != "NA")}
+  if(var_0 == "ffsr_gnrl")            {data_6.1.1 <- filter(data_6.1.1, ffsr_gnrl != "I don't know")}
+  if(var_0 == "ffsr_dsl")             {data_6.1.1 <- filter(data_6.1.1, ffsr_dsl != "I don't know")}
+  if(var_0 == "ffsr_gas")             {data_6.1.1 <- filter(data_6.1.1, ffsr_gas != "I don't know")}
+  if(var_0 == "benefic")              {data_6.1.1 <- filter(data_6.1.1, benefic != "NA")}
+  if(var_0 == "derecho")              {data_6.1.1 <- filter(data_6.1.1, derecho != "NA")}
+  if(var_0 == "yo_amnto")             {data_6.1.1 <- filter(data_6.1.1, yo_amnto != "NA")}
+  if(var_0 == "pobre_amnto")          {data_6.1.1 <- filter(data_6.1.1, pobre_amnto != "NA")}
+  if(var_0 == "rica_amnto")           {data_6.1.1 <- filter(data_6.1.1, rica_amnto != "NA")}
+  
+  
+  data_6.1.1 <- data_6.1.1 %>%
     rename(var_interest = any_of(var_0))
   
-  if(var_0 == "gnro"){
-    data_6.1.1 <- filter(data_6.1.1, gnro != "Other")
-  }
-  
-
   model <- feols(support ~ conditional | ID, data = data_6.1.1, split = ~ var_interest)
   
   summary_model <- summary(model)
@@ -2915,6 +2944,20 @@ for(var_0 in c("edad", "gnro")){
     
 }
 
+
+rm(data_6.1.2, data_6.1.2.1, data_6.1.1, colnames_0, model, summary_model)
+
+data_6.1.3 <- data_6.1.0 %>%
+  mutate(conf_low  = coefficient - 1.96*std_error,
+         conf_high = coefficient + 1.96*std_error)
+
+ggplot(data_6.1.3, aes(x = name))+
+  facet_grid(. ~ Term, scales = "free", space = "free")+
+  geom_errorbar(aes(ymin = conf_low, ymax = conf_high))+
+  geom_point(aes(y = coefficient))+
+  coord_cartesian(ylim = c(-0.1,2.2))+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 
 # 6.2   H2 ####
 
