@@ -259,7 +259,8 @@ data_2 <- data_1.4 %>%
   mutate(filter_4 = ifelse(attn2 == 3,0,1))%>%
   # Respondents that give the same answer to all conditional FFSR options
   mutate(filter_5 = ifelse(rr_lmpsm == rr_pobre & rr_lmpsm == rr_afctds & rr_lmpsm == rr_impuesto & rr_lmpsm == rr_deuda & rr_lmpsm == rr_etransp & rr_lmpsm == rr_paz & rr_lmpsm == rr_edu & rr_lmpsm == rr_ncer & rr_lmpsm == rr_deforst,1,0))%>%
-  select(-qtime, -pagetimeIntro_q42a, -pagetimeIntroq42b, -pagetimeIntroq42c, -pagetimeIntroq42d)
+  select(-qtime, -pagetimeIntro_q42a, -pagetimeIntroq42b, -pagetimeIntroq42c, -pagetimeIntroq42d)%>%
+  mutate(across(everything(), zap_label))
 
 rm(data_time, data_1.4)
 
@@ -268,9 +269,3 @@ rm(data_time, data_1.4)
 write_sav(data_2, "Outputs/Data_Cleaned.sav")
 
 rm(data_2, data_0)
-
-
-
-
-
-
