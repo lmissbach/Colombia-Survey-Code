@@ -2,67 +2,37 @@
 
 if(!require("pacman")) install.packages("pacman")
 
-p_load("arrow", "ggsci", "fixest", "haven", "Hmisc", "openxlsx", "rattle", "scales", "tidyverse", "sjlabelled", "tidymodels", "tidytext")
+p_load("arrow", "ggsci", "fixest", "ggpubr", "haven", "Hmisc", "openxlsx", "rattle", "scales", "tidyverse", "sjlabelled", "tidymodels", "tidytext")
 
 options(scipen=999)
 
 # 0.    Load data ####
 
-data_0 <- read_sav("../X_Paper_Colombia_Experiment/Analysis/Inputs/DE_124764_Brandenb_TU_Mcc_Berlin_Kolumbien  Ad hoc - final.sav")
+data_0 <- read_sav("Outputs/Data_Cleaned.sav")
 
 predictions_EXP <- read_csv("../2_Predictions/Colombia EXP/Predictions_Synthetic_Dataset_expenditures.csv")%>%
   rename(.pred_EXP = .pred)
 predictions     <- read_csv("../2_Predictions/Colombia 65/Predictions_Synthetic_Dataset_65.csv")
-# predictions_0 <- read_csv("../2_Predictions/Colombia 65/Predictions_Entire_Dataset_65.csv")
 
-#quantile(read_csv("../Colombia EXP/Predictions_Entire_Dataset_expenditures.csv")$.pred, prob = 0.5)  # Median costs: 10,802,917
-
-UR_data <- read.xlsx("Urb_Rur_CEDE_150425.xlsx")
-Provinces <- read.xlsx("Provinces_Regions.xlsx")
-# 1.    Renaming and cleaning (TBD) ####
-
-# Update later
-
-# data_0 <- read_sav("../Paper_Colombia_Experiment/Analysis/Inputs/Intermediate.sav")
-
-data_0 <- read_sav("../X_Paper_Colombia_Experiment/Analysis/Outputs/Intermediate.sav")
-
-UR_data_1 <- UR_data %>%
-  mutate(urban_01 = ifelse(indrural <= 0.5,1,0))%>%
-  select(municipio, depto, urban_01)
-
+# 1.    Renaming and cleaning ####
 # Basic data transformation
 data_1 <- data_0 %>%
-  mutate(ID = 1:n())%>%
+  # Basic filtering
+  filter(filter_1b == 0 & filter_2b == 0 & filter_2f == 0 & filter_3b == 0 & filter_3f == 0 & filter_3h == 0 & filter_3l == 0 & filter_3n == 0 & filter_3r == 0 & filter_3t == 0 & filter_3x == 0)%>%
+  #filter(if_all(c("filter_1b", "filter_2b", "filter_2f", "filter_3b","filter_3f", "filter_3h", "filter_3l", "filter_3n","filter_3r", "filter_3t", "filter_3x"), ~ .x == 0))
   rename(status_quo                        = ffsr_mnt,
          unconditional_prcl                = ffsr_prcl,
-         unconditional_complet             = ffsr_complet,
-         unconditional_prcl_recode_2       = ffsr_prcl_recode_2,
-         unconditional_prcl_recode_2extrem = ffsr_prcl_recode_2extrem,
-         unconditional_prcl_recode_3       = ffsr_prcl_recode_3)%>%
-  mutate(treatment = ifelse(rowSums(.[, grepl("^T_", names(.))] == 1) > 0, 1, 0))%>%
-  mutate(municipio = haven::as_factor(mncp),
-         depto     = haven::as_factor(dept))%>%
-  left_join(UR_data_1)%>%
-  left_join(Provinces, by = c("depto" = "labels"))
-
-rm(UR_data_1, UR_data, Provinces)
+         unconditional_complet             = ffsr_complet)
 
 data_1.1.1 <- data_1 %>%
-  select(ID, conditional, conditional_recode_2, conditional_recode_2extrem, conditional_recode_3)%>%
+  select(ID, conditional)%>%
   mutate(conditional_support = 1)%>%
-  rename(support                = conditional,
-         support_recode_2       = conditional_recode_2,
-         support_recode_2extrem = conditional_recode_2extrem, 
-         support_recode3        = conditional_recode_3)
+  rename(support = conditional)
 
 data_1.1.2 <- data_1 %>%
-  select(ID, unconditional_prcl, unconditional_prcl_recode_2, unconditional_prcl_recode_2extrem, unconditional_prcl_recode_3)%>%
+  select(ID, unconditional_prcl)%>%
   mutate(conditional_support = 0)%>%
-  rename(support                = unconditional_prcl,
-         support_recode_2       = unconditional_prcl_recode_2,
-         support_recode_2extrem = unconditional_prcl_recode_2extrem, 
-         support_recode3        = unconditional_prcl_recode_3)
+  rename(support = unconditional_prcl)
 
 data_1.1.3 <- data_1 %>%
   select(ID, rr_lmpsm:rr_deforst)%>%
@@ -74,12 +44,7 @@ data_1.1.3 <- data_1 %>%
   mutate(conditional_support = 1)
   
 data_1.1 <- bind_rows(data_1.1.1, data_1.1.2, data_1.1.3)%>%
-  left_join(select(data_1, ID, starts_with("T_"), starts_with("C_"), treatment))%>%
-  mutate(Group = ifelse(T_A == 1 | C_A == 1, "A",
-                        ifelse(T_B == 1 | C_B == 1, "B",
-                               ifelse(T_C == 1 | C_C == 1, "C",
-                                      ifelse(T_D == 1 | C_D == 1, "D", "Control")))))%>%
-  mutate(Group = factor(Group, level = c("Control", "A", "B", "C", "D")))
+  left_join(select(data_1, ID, starts_with("T_"), starts_with("C_"), treatment, Group))
 
 rm(data_1.1.1, data_1.1.2, data_1.1.3)
 
@@ -2810,8 +2775,6 @@ rm(cw_accuracy, data_5, data_5.2.test, data_5.2.testing, data_5.2.train, data_5.
 
 # 5.3   Descriptive statistics in general ####
 
-
-
 # 6     Specification charts ####
 
 data_6 <- data_1 %>%
@@ -2961,82 +2924,389 @@ ggplot(data_6.1.3, aes(x = name))+
 
 # 6.2   H2 ####
 
-# 9.    Tests ####
+# 7     Robustness checks ####
 
-test <- data_1.1 %>%
-  filter(type_support == "conditional")
+# 7.1   H1 ####
 
-feols(support ~ T_D, data = data_1.1)
-feols(support ~ conditional_support + T_D, data = data_1.1)
-feols(support ~ T_A, data = filter(data_1.1, type_support == "conditional"))
-feols(support ~ T_B, data = filter(data_1.1, type_support == "conditional"))
-feols(support ~ T_C, data = filter(data_1.1, type_support == "conditional"))
-feols(support ~ T_D, data = filter(data_1.1, type_support == "conditional"))
-feols(support ~ T_D, data = filter(data_1.1, type_support == "conditional"& (treatment == 0 | T_D == 1)))
-feols(support ~ T_D, data = filter(data_1.1, type_support == "unconditional_prcl"))
+data_7.1.1 <- data_0 %>%
+  select(ID, conditional)%>%
+  mutate(conditional_support = 1)%>%
+  rename(support = conditional)
 
-# Support (1-5) over conditional_support and treatment
+data_7.1.2 <- data_0 %>%
+  select(ID, ffsr_prcl)%>%
+  mutate(conditional_support = 0)%>%
+  rename(support = ffsr_prcl)
 
-model_2.1.1 <- feols(support ~ conditional_support + treatment, data = data_1.1)
-tidy_2.1.1 <- tidy(model_2.1.1)%>%
-  mutate(Type = "OLS")
+data_7.1.3 <- data_0 %>%
+  select(ID, rr_lmpsm:rr_deforst)%>%
+  pivot_longer(-ID, names_to = "rr_", values_to = "not_rounded")%>%
+  group_by(ID)%>%
+  summarise(support = mean(not_rounded))%>%
+  ungroup()%>%
+  mutate(Type = "Not rounded")%>%
+  mutate(conditional_support = 1)
 
-model_2.1.2 <- feols(support ~ conditional_support + T_A + T_B + T_C + T_D, data = data_1.1)
-tidy_2.1.2 <- tidy(model_2.1.2)%>%
-  mutate(Type = "OLS")
+data_7.1 <- bind_rows(data_7.1.1, data_7.1.2, data_7.1.3)%>%
+  mutate(Type = ifelse(is.na(Type), "rounded", Type))%>%
+  left_join(select(data_0, -conditional, -ffsr_prcl), by = "ID")
 
-model_2.1.2.1 <- feols(support ~ T_A, data = data_1.1)
-model_2.1.2.2 <- feols(support ~ T_B, data = data_1.1)
-model_2.1.2.3 <- feols(support ~ T_C, data = data_1.1)
-model_2.1.2.4 <- feols(support ~ T_D, data = data_1.1)
+rm(data_7.1.1, data_7.1.2, data_7.1.3)
 
-etable(model_2.1.2, model_2.1.2.1, model_2.1.2.2, model_2.1.2.3, model_2.1.2.4, tex = TRUE, dict = dict_latex,
-       file = "../Colombia_Survey_Experiment/Paper/Tables/Table_H2.tex",
-       digits = 3, replace = TRUE, fitstat = c("n", "r2"), style.tex = tex.style, se.row = TRUE, tpt = TRUE,
-       title = "Hypothesis 1",  
-       label = "tab:H2", 
-       # adjustbox = "width = 1\\textwidth, max height = 0.95\\textheight, center", 
-       placement = "htbp!")
+# Idea is that many specifications are conducted with and without various cleaning steps and with and without various fixed effects
 
-# Binary variable (0/1)
-model_2.2.1 <- feglm(support ~ conditional_support + treatment, family = binomial(link = "logit"), data = data_1.2.1)
-model_2.2.2 <- feglm(support ~ conditional_support + T_A + T_B + T_C + T_D, family = binomial(link = "logit"), data = data_1.2.1)
-model_2.2.3 <- feglm(support ~ conditional_support + treatment, family = binomial(link = "probit"), data = data_1.2.1)
-model_2.2.4 <- feglm(support ~ conditional_support + T_A + T_B + T_C + T_D, family = binomial(link = "probit"), data = data_1.2.1)
+combinations_H1 <- read.xlsx("Filter_Combinations.xlsx", sheet = "H1")%>%
+  pivot_longer(-Specification, names_to = "filter", values_to = "values")%>%
+  filter(values == 1)%>%
+  filter(Specification != 1)
 
-tidy_2.2.1 <- tidy(model_2.2.1)%>%
-  mutate(Type = "Logit")
-tidy_2.2.2 <- tidy(model_2.2.2)%>%
-  mutate(Type = "Logit")
-tidy_2.2.3 <- tidy(model_2.2.3)%>%
-  mutate(Type = "Probit")
-tidy_2.2.4 <- tidy(model_2.2.4)%>%
-  mutate(Type = "Probit")
+prepare_specification_chart <- function(data_7.1_input, filter_0, rounded_0, outcome_0){
+  
+  # Raw
+  model_7.1.1 <- feols(support ~ conditional_support, data = data_7.1_input)
+  # Treatment and group control
+  model_7.1.2 <- feols(support ~ conditional_support + Group + treatment, data = data_7.1_input)
+  # ID
+  model_7.1.3 <- feols(support ~ conditional_support | ID, data = data_7.1_input)
+  
+  tidy_7.1.1  <- tidy(model_7.1.1)%>%
+    filter(term == "conditional_support")%>%
+    mutate(FE       = "None")
+  
+  tidy_7.1.2  <- tidy(model_7.1.2)%>%
+    filter(term == "conditional_support")%>%
+    mutate(FE       = "Group + treatment")
+  
+  tidy_7.1.3  <- tidy(model_7.1.3)%>%
+    filter(term == "conditional_support")%>%
+    mutate(FE       = "ID")
+  
+  data_7.1_output <- tidy_7.1.1 %>%
+    bind_rows(tidy_7.1.2)%>%
+    bind_rows(tidy_7.1.3)%>%
+    mutate(Filter  = filter_0,
+           Rounded = rounded_0,
+           Outcome = outcome_0)
+  
+  return(data_7.1_output)
+  
+}
 
-# Extreme classification (0/1)
-model_2.3.1 <- feglm(support ~ conditional_support + treatment, family = binomial(link = "logit"), data = data_1.3.1)
-model_2.3.2 <- feglm(support ~ conditional_support + T_A + T_B + T_C + T_D, family = binomial(link = "logit"), data = data_1.3.1)
-model_2.3.3 <- feglm(support ~ conditional_support + treatment, family = binomial(link = "probit"), data = data_1.3.1)
-model_2.3.4 <- feglm(support ~ conditional_support + T_A + T_B + T_C + T_D, family = binomial(link = "probit"), data = data_1.3.1)
+# Baseline
 
-tidy_2.3.1 <- tidy(model_2.3.1)%>%
-  mutate(Type = "Logit")
-tidy_2.3.2 <- tidy(model_2.3.2)%>%
-  mutate(Type = "Logit")
-tidy_2.3.3 <- tidy(model_2.3.3)%>%
-  mutate(Type = "Probit")
-tidy_2.3.4 <- tidy(model_2.3.4)%>%
-  mutate(Type = "Probit")
+data_7.1_temp <- filter(data_7.1, Type == "rounded" & if_all(c("filter_1b", "filter_2b", "filter_2f", "filter_3b", "filter_3f", "filter_3h", "filter_3l", "filter_3n", "filter_3r", "filter_3t", "filter_3x"), ~ .x == 0))
+data_7.1.1.0 <- prepare_specification_chart(data_7.1_temp,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Rounded","Standard")%>%
+  mutate(Type = "Baseline")
+
+rm(data_7.1_temp)
+
+# Various filters
+
+data_7.1.1.1 <- data.frame()
+
+for(i in c(2:20)){
+  combinations_H1.1 <- combinations_H1 %>%
+    filter(Specification == i)
+  
+  data_7.1_temp <- filter(data_7.1, Type == "rounded" & if_all(all_of(combinations_H1.1$filter), ~ .x == 0))
+  data_7.1.1.1_temp <- prepare_specification_chart(data_7.1_temp,paste(sub("filter_","", combinations_H1.1$filter), collapse = "_"),"Rounded","Standard")
+  
+  data_7.1.1.1 <- data_7.1.1.1 %>%
+    bind_rows(data_7.1.1.1_temp)
+}
+
+rm(combinations_H1, combinations_H1.1, data_7.1.1.1_temp)
+
+# Different outcomes 
+
+data_7.1_temp <- data_7.1 %>%
+  filter(Type == "rounded")%>%
+  mutate(support_2 = ifelse(support %in% c(1,2),0,
+                            ifelse(support %in% c(4,5),1, NA)),
+         support_3 = ifelse(support %in% c(1,2),1,
+                            ifelse(support %in% c(3),2,
+                                   ifelse(support %in% c(4,5),3,NA))))
+
+data_7.1_temp_2 <- data_7.1_temp %>%
+  mutate(NAs = ifelse(is.na(support_2),1,0))%>%
+  group_by(ID)%>%
+  mutate(NAs = sum(NAs))%>%
+  ungroup()%>%
+  arrange(ID)%>%
+  filter(NAs == 0)%>%
+  mutate(support = support_2)
+
+data_7.1.1.2 <- prepare_specification_chart(data_7.1_temp_2,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Rounded","Binary")
+
+data_7.1_temp_3 <- data_7.1_temp %>%
+  mutate(support = support_3)
+
+data_7.1.1.3 <- prepare_specification_chart(data_7.1_temp_3,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Rounded","Three levels")
+
+# Not rounded
+
+data_7.1_temp_4 <- filter(data_7.1, (Type == "Not rounded" | conditional_support == 0) & if_all(c("filter_1b", "filter_2b", "filter_2f", "filter_3b", "filter_3f", "filter_3h", "filter_3l", "filter_3n", "filter_3r", "filter_3t", "filter_3x"), ~ .x == 0))
+data_7.1.1.4 <- prepare_specification_chart(data_7.1_temp_4,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Not rounded","Standard")
+
+# No filter
+
+data_7.1_temp_5 <- filter(data_7.1, Type == "rounded")
+data_7.1.1.5 <- prepare_specification_chart(data_7.1_temp_5,"No filter","Rounded","Standard")
+
+data_7.1.X <- data_7.1.1.0 %>%
+  bind_rows(data_7.1.1.1)%>%
+  bind_rows(data_7.1.1.2)%>%
+  bind_rows(data_7.1.1.3)%>%
+  bind_rows(data_7.1.1.4)%>%
+  bind_rows(data_7.1.1.5)
+
+rm(data_7.1.1.0, data_7.1.1.1, data_7.1.1.2, data_7.1.1.3, data_7.1.1.4, data_7.1_temp_2, data_7.1_temp_3, data_7.1_temp, data_7.1_temp_4, data_7.1_temp_5, data_7.1.1.5)
+  
+data_7.1.0 <- data_7.1.X %>%
+  mutate(Type     = ifelse(is.na(Type), "Other", 
+                           ifelse(FE == "None", "Baseline", "Other")))%>%
+  mutate(conf_low = estimate - 1.96*std.error,
+         conf_high = estimate + 1.96*std.error)%>%
+  mutate("Age < 81"                         = ifelse(str_detect(Filter, "1a"),1,0),
+         "Age < 99"                         = ifelse(str_detect(Filter, "1b"),1,0),
+         "Remove fastest 2%"                = ifelse(str_detect(Filter, "2a"),1,0),
+         "Remove fastest 5%"                = ifelse(str_detect(Filter, "2b"),1,0),
+         "Remove fastest 10%"               = ifelse(str_detect(Filter, "2c"),1,0),
+         "Remove slowest 10%"               = ifelse(str_detect(Filter, "2d"),1,0),
+         "Remove slowest 5%"                = ifelse(str_detect(Filter, "2e"),1,0),
+         "Remove slowest 2%"                = ifelse(str_detect(Filter, "2f"),1,0),
+         "Remove fastest 2% first-stage"    = ifelse(str_detect(Filter, c("3a")) | str_detect(Filter, c("3g")) | str_detect(Filter, c("3m")) | str_detect(Filter, c("3s")),1,0),
+         "Remove fastest 5% first-stage"    = ifelse(str_detect(Filter, c("3b")) | str_detect(Filter, c("3h")) | str_detect(Filter, c("3n")) | str_detect(Filter, c("3t")),1,0),
+         "Remove fastest 10% first-stage"   = ifelse(str_detect(Filter, c("3c")) | str_detect(Filter, c("3i")) | str_detect(Filter, c("3o")) | str_detect(Filter, c("3u")),1,0),
+         "Remove slowest 10% first-stage"   = ifelse(str_detect(Filter, c("3d")) | str_detect(Filter, c("3j")) | str_detect(Filter, c("3p")) | str_detect(Filter, c("3v")),1,0),
+         "Remove slowest 5% first-stage"    = ifelse(str_detect(Filter, c("3e")) | str_detect(Filter, c("3k")) | str_detect(Filter, c("3q")) | str_detect(Filter, c("3w")),1,0),
+         "Remove slowest 2% first-stage"    = ifelse(str_detect(Filter, c("3f")) | str_detect(Filter, c("3l")) | str_detect(Filter, c("3r")) | str_detect(Filter, c("3x")),1,0),
+         "Attention check correct"          = ifelse(str_detect(Filter, "4"),1,0),
+         "Variation in conditional support" = ifelse(str_detect(Filter, "5"),1,0))%>%
+  mutate(ID = 1:n())%>%
+  arrange(estimate, ID)%>%
+  mutate(seq = 1:n())%>%
+  mutate(seq_fa = as_factor(seq))%>%
+  mutate(name = "Coefficient")
+
+P_7.1.1 <- ggplot(data_7.1.0, aes(x = seq))+
+  scale_x_discrete()+
+  annotate("rect", xmin = (data_7.1.0$seq[data_7.1.0$Type == "Baseline"] - 0.5), xmax = (data_7.1.0$seq[data_7.1.0$Type == "Baseline"] + 0.5), ymin = -0.5, ymax = 1.5, fill = "grey90", colour = "lightgrey", size = 0.1)+
+  geom_hline(aes(yintercept = 0))+
+  geom_errorbar(aes(ymin = conf_low, ymax = conf_high, colour = Type), width = 0.7, linewidth = 0.2)+
+  geom_point(aes(y = estimate, colour = Type), size = 1.2, shape = 15)+
+  facet_grid(name ~ .,
+             scales = "free_y",
+             space  = "free_y",
+             switch = "y")+
+  coord_cartesian(ylim = c(-0.1,1.4))+
+  theme_bw()+
+  guides(colour = "none")+
+  xlab("")+ylab("")+
+  scale_colour_manual(values = c("#6F99ADFF", "black"))+
+  scale_fill_manual(values   = c("grey", "#6F99ADFF"))+
+  scale_size_manual(values   = c(0.2, 0.35))+
+  scale_y_continuous(expand = c(0,0), breaks = c(0,0.25,0.5,0.75,1,1.25))+
+  theme(axis.text.x      = element_blank(),
+        strip.placement = "outside",
+        axis.text.y = element_text(size = 7), 
+        axis.title  = element_blank(), 
+        plot.title = element_text(size = 7), 
+        legend.position = "bottom", 
+        strip.text = element_text(size = 7), 
+        strip.text.y = element_text(size = 7), 
+        panel.grid.major = element_line(size = 0.3), 
+        axis.ticks = element_line(size = 0.4),
+        legend.text = element_text(size = 7), 
+        legend.title = element_text(size = 7), 
+        plot.margin = unit(c(0.1,0.1,0,0), "cm"), 
+        panel.border = element_rect(size = 0.3))
+
+interest_df <- c("Age < 81" = 0,
+                 "Age < 99" = 1,
+                 "Attention check correct" = 0,
+                 "Binary" = 0,
+                 "Group + treatment" = 0,
+                 "IID" = 0,
+                 "None" = 1,
+                 "Remove fastest 10%"               = 0,
+                 "Remove fastest 10% first-stage"   = 0,
+                 "Remove fastest 2%"                = 0,
+                 "Remove fastest 2% first-stage"    = 0,
+                 "Remove fastest 5%"                = 1,
+                 "Remove fastest 5% first-stage"    = 1,
+                 "Remove slowest 10%"               = 0,
+                 "Remove slowest 10% first-stage"   = 0,
+                 "Remove slowest 2%"                = 1,
+                 "Remove slowest 2% first-stage"    = 1,
+                 "Remove slowest 5%"                = 0,
+                 "Remove slowest 5% first-stage"    = 0,
+                 "Rounded"                          = 1,
+                 "Standard"                         = 1,
+                 "Three levels"                     = 0,
+                 "Variation in conditional support" = 0)%>%
+  as_tibble(rownames = "Variable")%>%
+  rename(value_interest = value)
+
+data_7.1.0_cat <- data_7.1.0 %>%
+  select(ID, seq, seq_fa, FE, Rounded, Outcome, Type:"Variation in conditional support", -conf_low, -conf_high)%>%
+  mutate(Rounded             = ifelse(Rounded == "Rounded",1,0),
+         "Standard"          = ifelse(Outcome == "Standard",1,0),
+         "Binary"            = ifelse(Outcome == "Binary",1,0),
+         "Three levels"      = ifelse(Outcome == "Three levels",1,0),
+         "IID"                = ifelse(FE == "ID",1,0),
+         "None"              = ifelse(FE == "None",1,0),
+         "Group + treatment" = ifelse(FE == "Group + treatment",1,0))%>%
+  select(ID, seq, seq_fa, Type, everything(), -Outcome, -FE)%>%
+  pivot_longer("Rounded":"Group + treatment", names_to = "Variable", values_to = "Value")%>%
+  mutate(Value = ifelse(Type == "Baseline" & Value == 1,2,Value))%>%
+  # For different colours
+  left_join(interest_df)%>%
+  mutate(Value_2 = ifelse(Value == 2, 1, # Main Specification
+                          ifelse(Value == 1 & value_interest == 1, 2, # Criterion identical with main specification - both fulfilled
+                                 ifelse(Value == 1 & value_interest != 1, 3, # Criterion not fulfilled while fulfilled in main specification
+                                        ifelse(Value == 0 & value_interest == 0,4, # Criterion identical with main specification - both not fulfilled
+                                               ifelse(Value == 0 & value_interest != 0, 5, 6))))))%>% # Criterion fulfilled while not fulfilled in main specificataion 
+  mutate(Variable = factor(Variable, levels = c("Standard", "Binary", "Three levels", "Rounded",
+                                                "Variation in conditional support", "Attention check correct", "Age < 81", "Age < 99",
+                                                "Remove fastest 2%", "Remove fastest 5%", "Remove fastest 10%", "Remove slowest 2%", "Remove slowest 5%", "Remove slowest 10%",
+                                                "Remove fastest 2% first-stage", "Remove fastest 5% first-stage", "Remove fastest 10% first-stage",
+                                                "Remove slowest 2% first-stage", "Remove slowest 5% first-stage", "Remove slowest 10% first-stage",
+                                                "None", "Group + treatment", "IID")))%>%
+  mutate(Group = ifelse(Variable %in% c("Standard", "Binary", "Three levels", "Rounded"), "Outcome",
+                        ifelse(Variable %in% c("Variation in conditional support", "Attention check correct", "Age < 81", "Age < 99",
+                                               "Remove fastest 2%", "Remove fastest 5%", "Remove fastest 10%", "Remove slowest 2%", "Remove slowest 5%", "Remove slowest 10%",
+                                               "Remove fastest 2% first-stage", "Remove fastest 5% first-stage", "Remove fastest 10% first-stage",
+                                               "Remove slowest 2% first-stage", "Remove slowest 5% first-stage", "Remove slowest 10% first-stage"), "Filter",
+                               ifelse(Variable %in% c("None", "Group + treatment", "IID"), "Controls", NA))))%>%
+  mutate(Group = factor(Group, levels = c("Outcome", "Filter", "Controls")))%>%
+  mutate(Value_2 = factor(Value_2))
+
+P_7.1.2 <- ggplot(data = data_7.1.0_cat, aes(x = seq_fa, y = reorder(Variable, desc(Variable))))+
+  scale_x_discrete()+
+  scale_y_discrete(expand = c(0,0.75))+
+  annotate("rect", xmin = (data_7.1.0$seq[data_7.1.0$Type == "Baseline"] - 0.5), xmax = (data_7.1.0$seq[data_7.1.0$Type == "Baseline"] + 0.5), ymin = 0, ymax = Inf, fill = "grey90", colour = "lightgrey", size = 0.1)+
+  geom_point(aes(colour = Value_2, fill = Value_2), shape = 22, size = 1.2, stroke = 0.2)+
+  facet_grid(Group ~ .,
+             scales = "free_y",
+             space  = "free_y",
+             switch = "y")+
+  scale_colour_manual(values = c("black", "black", "black", "gray60", "black"))+
+  scale_fill_manual(values = c("#6F99ADFF","gray40", "gray40", "grey85", "#E18727FF"))+
+  # facet_grid(Group ~ .,
+  #            scales = "free_y",
+  #            space  = "free_y",
+  #            switch = "y")+
+  theme_bw()+
+  theme(axis.text.x = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.ticks.x = element_blank(),
+        strip.placement = "outside",
+        axis.text.y = element_text(size = 5), 
+        axis.title  = element_text(size = 6), 
+        plot.title = element_text(size = 7), 
+        legend.position = "bottom", 
+        strip.text      = element_text(size = 6),
+        axis.ticks      = element_line(size = 0.2),
+        legend.text     = element_text(size = 7), 
+        legend.title    = element_text(size = 7), 
+        plot.margin     = unit(c(0.1,0.1,0,0), "cm"), 
+        panel.border    = element_rect(size = 0.3))+
+  ylab("")+xlab("")+
+  guides(fill = "none", colour = "none")
+
+P_7.1 <- ggarrange(P_7.1.1, P_7.1.2, nrow = 2, align = "hv", heights = c(0.8,1))
+
+png("../Colombia_Survey_Experiment/Paper/Figures/2_Appendix/Figure_B_H1.png", width = 6, height = 7, unit = "in", res = 400)
+print(P_7.1)
+dev.off()
+
+rm(P_7.1, P_7.1.1, P_7.1.2, interest_df, data_7.1, data_7.1.0, data_7.1.0_cat, data_7.1.X)
+
+# 7.2   H2 ####
+
+# treatment effects on conditional and unconditional support
+
+data_7.2.1 <- data_0 %>%
+  mutate(First_Stage = ifelse(Group == 1, "No","Yes"))%>%
+  mutate(Group = factor(Group))
+
+prepare_specification_chart <- function(data_7.2_input, filter_0, rounded_0, outcome_0){
+  
+  # Raw
+  model_7.2.1.1 <- feols(ffsr_prcl ~ treatment + Group, data = data_7.2_input)
+  # First - stage control
+  model_7.2.1.2 <- feols(ffsr_prcl ~ treatment + First_Stage, data = data_7.2_input)
+  # No control
+  model_7.2.1.3 <- feols(ffsr_prcl ~ treatment, data = data_7.2_input)
+  
+  tidy_7.2.1.1  <- tidy(model_7.2.1.1)%>%
+    filter(term == "treatment")%>%
+    mutate(FE = "Group")
+  
+  tidy_7.2.1.2  <- tidy(model_7.2.1.2)%>%
+    filter(term == "treatment")%>%
+    mutate(FE = "First_Stage")
+  
+  tidy_7.2.1.3  <- tidy(model_7.2.1.3)%>%
+    filter(term == "treatment")%>%
+    mutate(FE = "None")
+  
+  data_7.2_output <- tidy_7.2.1.1 %>%
+    bind_rows(tidy_7.2.1.2)%>%
+    bind_rows(tidy_7.2.1.3)%>%
+    mutate(Filter  = filter_0,
+           Rounded = rounded_0,
+           Outcome = outcome_0)
+  
+  return(data_7.2_output)
+  
+}
+
+# Baseline
+
+data_7.2_temp <- filter(data_7.2.1, if_all(c("filter_1b", "filter_2b", "filter_2f", "filter_3b", "filter_3f", "filter_3h", "filter_3l", "filter_3n", "filter_3r", "filter_3t", "filter_3x"), ~ .x == 0))
+data_7.2.1.0 <- prepare_specification_chart(data_7.2_temp,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","NA","Standard")%>%
+  mutate(Type = "Baseline")
+
+rm(data_7.1_temp)
+
+# Various filtering criteria
+
+combinations_H1 <- read.xlsx("Filter_Combinations.xlsx", sheet = "H2")%>%
+  pivot_longer(-Specification, names_to = "filter", values_to = "values")%>%
+  filter(values == 1)%>%
+  filter(Specification != 1)
+
+data_7.2.1.1 <- data.frame()
+
+for(i in c(2:20)){
+  combinations_H1.1 <- combinations_H1 %>%
+    filter(Specification == i)
+  
+  data_7.2_temp <- filter(data_7.2.1, if_all(all_of(combinations_H1.1$filter), ~ .x == 0))
+  data_7.2.1.1_temp <- prepare_specification_chart(data_7.2_temp,paste(sub("filter_","", combinations_H1.1$filter), collapse = "_"),"NA","Standard")
+  
+  data_7.2.1.1 <- data_7.2.1.1 %>%
+    bind_rows(data_7.2.1.1_temp)
+}
+
+rm(combinations_H1, combinations_H1.1, data_7.2.1.1_temp)
+
+# Inclusion / exclusion of control group
+
+# Standard, binary, Three levels
+# Inclusion of control group and controls (Group / first-stage with/without control group)
+
+# 7.2.1 H2.1 ####
+# 7.2.2 H2.2 ####
+# 7.2.3 H2.3 ####
+# 7.2.4 H2.4 ####
+# 7.3   H3 ####
 
 
-
-
-
-# Receiving information will increase unconditional and conditional support for FFSR among respondents that do not endorse the incumbent president.
-# Compare supporters and non-supporters.
-# Compare treatment effects for all information treatments among both groups.
-
-# 9.1 Supplementary Graphics ####
+# 9 Supplementary Graphics ####
 
 data_0.1 <- data_1 %>%
   mutate(IQ = ifelse(ingrso %in% c(1,2),"IQ1",
