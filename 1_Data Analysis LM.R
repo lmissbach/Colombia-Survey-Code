@@ -2780,7 +2780,7 @@ rm(cw_accuracy, data_5, data_5.2.test, data_5.2.testing, data_5.2.train, data_5.
 data_6 <- data_1 %>%
   select(ID,edad, gnro, etnia, Province, edu, ingrso, grp_ingrso, moto, carro, transpub, ccnr, cc_info, cc_preocup, cc_econ,
          cc_imp_co2, cc_imp_pers, cc_imp_equit, pol_pres, izq_der, prop_acrd_fepc, prop_acrd_paz, prop_acrd_energ,
-         pais_gnrl, pais_confianza_army, pais_confianza_police, pais_confianza_prsdnt, pais_dmcrc, pais_econ,
+         pais_gnrl, pais_army, pais_police, pais_prsdnt, pais_dmcrc, pais_econ,
          ffsr_gnrl, ffsr_dsl, ffsr_gas, benefic, derecho, yo_amnto, pobre_amnto, rica_amnto, conditional, unconditional_prcl,
          T_A:T_D, C_A:C_D, treatment)%>%
   mutate(Group = ifelse(T_A == 1 | C_A == 1, "A",
@@ -2794,8 +2794,8 @@ data_6 <- data_1 %>%
          etnia = factor(ifelse(etnia == 6, "White", "Non-white")),
          edu = factor(ifelse(edu < 3, "Primary or none",
                              ifelse(edu < 5, "Secondary or technial", "University or postgraduate"))),
-         ingrso = factor(ifelse(ingrso < 4, "Between 0 - 900,000 COP",
-                                ifelse(ingrso < 8, "Between 900,001 - 1,825,000 COP", "More than 1,825,001 COP"))),
+         ingrso = factor(ifelse(ingrso < 4, "0 - 900,000 COP",
+                                ifelse(ingrso < 8, "900,001 - 1,825,000 COP", "> 1,825,001 COP"))),
          grp_ingrso = factor(ifelse(grp_ingrso < 3, "Low and lower-middle",
                                     ifelse(grp_ingrso < 4, "Middle", "Upper-middle and high"))),
          ccnr = factor(ifelse(ccnr == 1, "Electricity",
@@ -2803,7 +2803,7 @@ data_6 <- data_1 %>%
          cc_info = factor(ifelse(cc_info < 3, "Not informed",
                                  ifelse(cc_info == 3, "NA", "Informed"))),
          cc_preocup = factor(ifelse(cc_preocup < 3, "Not worried",
-                                    ifelse(cc_preocup == 3, "NA", "Informed"))),
+                                    ifelse(cc_preocup == 3, "NA", "Worried"))),
          cc_econ = factor(ifelse(cc_econ == 2, "Priority to economcy",
                                  ifelse(cc_econ == 5, "Priority to climate change",
                                         ifelse(cc_econ == 4, "Equal priority", "NA")))),
@@ -2814,7 +2814,7 @@ data_6 <- data_1 %>%
                                         ifelse(izq_der == 4 | izq_der == 5, "Izquierda", "NA")))))%>%
   mutate_at(vars(cc_imp_co2, cc_imp_pers, cc_imp_equit), 
             ~ factor(ifelse(. < 3, "Disagree", ifelse(. == 3, "Neutral", "Agree"))))%>%
-  mutate_at(vars(pais_confianza_army, pais_confianza_police, pais_confianza_prsdnt), 
+  mutate_at(vars(pais_army, pais_police, pais_prsdnt), 
             ~ factor(ifelse(. < 3, "Low trust", ifelse(. == 3, "Moderate trust", "High trust"))))%>%
   mutate_at(vars(pais_dmcrc, pais_econ), ~ factor(ifelse(. < 3, "Bad",
                                                          ifelse(. > 3, "Good", "NA"))))%>%
@@ -2858,9 +2858,9 @@ for(var_0 in colnames_0){
   if(var_0 == "cc_imp_equit")         {data_6.1.1 <- filter(data_6.1.1, cc_imp_equit != "Neutral")}
   if(var_0 == "pol_pres")             {data_6.1.1 <- filter(data_6.1.1, pol_pres != "NA")}
   if(var_0 == "izq_der")              {data_6.1.1 <- filter(data_6.1.1, izq_der != "NA" & !is.na(izq_der))}
-  if(var_0 == "pais_confianza_army")  {data_6.1.1 <- filter(data_6.1.1, pais_confianza_army != "Moderate trust")}
-  if(var_0 == "pais_confianza_police"){data_6.1.1 <- filter(data_6.1.1, pais_confianza_police != "Moderate trust")}
-  if(var_0 == "pais_confianza_prsdnt"){data_6.1.1 <- filter(data_6.1.1, pais_confianza_prsdnt != "Moderate trust")}
+  if(var_0 == "pais_army")  {data_6.1.1 <- filter(data_6.1.1, pais_army != "Moderate trust")}
+  if(var_0 == "pais_police"){data_6.1.1 <- filter(data_6.1.1, pais_police != "Moderate trust")}
+  if(var_0 == "pais_prsdnt"){data_6.1.1 <- filter(data_6.1.1, pais_prsdnt != "Moderate trust")}
   if(var_0 == "prop_acrd_fepc")       {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_fepc))}
   if(var_0 == "prop_acrd_paz")        {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_paz))}
   if(var_0 == "prop_acrd_energ")      {data_6.1.1 <- filter(data_6.1.1, !is.na(prop_acrd_energ))}
@@ -2912,15 +2912,37 @@ rm(data_6.1.2, data_6.1.2.1, data_6.1.1, colnames_0, model, summary_model)
 
 data_6.1.3 <- data_6.1.0 %>%
   mutate(conf_low  = coefficient - 1.96*std_error,
-         conf_high = coefficient + 1.96*std_error)
-
-ggplot(data_6.1.3, aes(x = name))+
-  facet_grid(. ~ Term, scales = "free", space = "free")+
+         conf_high = coefficient + 1.96*std_error)%>%
+  mutate(Term = factor(Term, levels = c("edad", "gnro", "etnia", "Province", "edu", "ingrso", "grp_ingrso", "moto", "carro", "transpub", "ccnr", "cc_info", "cc_preocup", "cc_econ",
+                                        "cc_imp_co2", "cc_imp_pers", "cc_imp_equit", "pol_pres", "izq_der", "prop_acrd_fepc", "prop_acrd_paz", "prop_acrd_energ",
+                                        "pais_gnrl", "pais_army", "pais_police", "pais_prsdnt", "pais_dmcrc", "pais_econ",
+                                        "ffsr_gnrl", "ffsr_dsl", "ffsr_gas", "benefic", "derecho", "yo_amnto", "pobre_amnto", "rica_amnto")))%>%
+  mutate(name = case_when(Term == "edad" ~ str_replace(name, "^", "Age: "),
+                          Term == "gnro" ~ str_replace(name, "^", "Gender: "),
+                          Term == "etnia" ~ str_replace(name, "^", "Ethnicity: "),
+                          Term == "Province" ~ str_replace(name, "^", "Province: "),
+                          Term == "edu" ~ str_replace(name, "^", "Education: "),
+                          Term == "ingrso" ~ str_replace(name, "^", "Income: "),
+                          Term == "grp_ingrso" ~ str_replace(name, "^", "Income group: "),
+                          Term == "moto" ~ str_replace(name, "^", "Motorcycle: "),
+                          Term == "carro" ~ str_replace(name, "^", "Car: "),
+                          Term == "transpub" ~ str_replace(name, "^", "Public transport: "),
+                          Term == "ccnr" ~ str_replace(name, "^", "Cooking fuel: "),
+                          Term == "cc_info" ~ str_replace(name, "^", "Informed about CC: "),
+                          Term == "cc_preocup" ~ str_replace(name, "^", "Worried about CC: "),
+                          
+                          TRUE ~ name))%>%
+  mutate(Row = ifelse(Term %in% c("edad", "gnro", "etnia", "Province", "edu", "ingrso", "grp_ingrso", "moto", "carro", "transpub", "ccnr", "cc_info", "cc_preocup", "cc_econ",
+                                  "cc_imp_co2", "cc_imp_pers", "cc_imp_equit"),1,0))
+ggplot(filter(data_6.1.3, Row == 1), aes(x = name))+
+  geom_hline(aes(yintercept = 0))+
+  facet_grid(Row ~ Term, scales = "free", space = "free")+
   geom_errorbar(aes(ymin = conf_low, ymax = conf_high))+
   geom_point(aes(y = coefficient))+
   coord_cartesian(ylim = c(-0.1,2.2))+
   theme_bw()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        strip.text = element_blank())
 
 # 6.2   H2 ####
 
