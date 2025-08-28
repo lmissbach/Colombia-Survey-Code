@@ -2411,14 +2411,7 @@ dev.off()
 # Variation in which variables drive variation in outcomes?
 
 data_5 <- data_1 %>%
-  mutate(Group = ifelse(T_A == 1 | C_A == 1, "A",
-                        ifelse(T_B == 1 | C_B == 1, "B",
-                               ifelse(T_C == 1 | C_C == 1, "C",
-                                      ifelse(T_D == 1 | C_D == 1, "D", "Control")))))%>%
-  mutate(Group = factor(Group, level = c("Control", "A", "B", "C", "D")))%>%
-  select(edad:cc_imp_equit,pol_pres:izq_der,prop_eschr_labrl:pais_econ, ffsr_gnrl:protestas, unconditional_prcl, rr_lmpsm:rr_deforst, treatment, Group, -attn1, -attn2)%>%
-  select(treatment, Group, everything(), unconditional_prcl, starts_with("rr_"))%>%
-  select(-carro_combus_other_ans, -precio_combus)%>%
+  select(-ID, -date, -starts_with("filter"), -attn1, -attn2, -carro_combus_other_ans, -precio_combus)%>%
   mutate(prop_acrd_labrl = ifelse(is.na(prop_entd_labrl),2,
                                   ifelse(is.na(prop_acrd_labrl),3,prop_acrd_labrl)),
          prop_acrd_pensl = ifelse(is.na(prop_entd_pensl),2,
@@ -2433,32 +2426,29 @@ data_5 <- data_1 %>%
                                   ifelse(is.na(prop_acrd_energ),3,prop_acrd_energ)),
          prop_acrd_ning = ifelse(is.na(prop_entd_ning),2,
                                  ifelse(is.na(prop_acrd_ning),3,prop_acrd_ning)))%>%
+  select(-starts_with("prop_eschr"), -starts_with("prop_entd"), -starts_with("protestas_lid"))%>%
+  select(edad:frst_d, pais_inst:pais_indv, everything())%>%
   # Convert to factors
-  mutate_at(vars(gnro:protestas, -ffsr_dsl, -ffsr_gas, -ffsr_gnrl), ~ haven::as_factor(.))%>%
+  mutate_at(vars(gnro:pais_indv, sesgo:Group), ~ haven::as_factor(.))%>%
   # Get rid of NAs
   mutate(moto_dias  = replace(moto_dias, is.na(moto_dias), "No days"),
          carro_dias = replace(carro_dias, is.na(carro_dias), "No days"))%>%
   mutate_at(vars(starts_with("carro_combus_")), ~ replace(., is.na(.), "No"))%>%
   mutate_at(vars(transpub_dias, taxi_dias, bici_dias), ~ replace(., is.na(.), "Never"))%>%
-  mutate(izq_der    = fct_expand(izq_der, "Apolitico"),
-         izq_der    = replace(izq_der, is.na(izq_der), "Apolitico"),
-         pais_gnrl  = fct_expand(pais_gnrl, "Prefiero no decir"),
-         pais_gnrl  = replace(pais_gnrl, is.na(pais_gnrl), "Prefiero no decir"))%>%
-  select(-starts_with("prop_entd_"), -starts_with("prop_eschr_"))%>%
   mutate_at(vars(starts_with("prop_acrd_")), ~ factor(., labels = c("No", "Yes", "Not heard", "Not understood")))%>%
   mutate(ffsr_dsl = ifelse(is.na(ffsr_dsl), ffsr_gnrl, ffsr_dsl),
          ffsr_gas = ifelse(is.na(ffsr_gas), ffsr_gnrl, ffsr_gas))%>%
   mutate_at(vars(ffsr_dsl, ffsr_gas), ~ factor(., labels = c("Yes", "I don't know", "No")))%>%
-  mutate(ffsr_gnrl = haven::as_factor(ffsr_gnrl))%>%
-  mutate(unconditional_prcl = haven::as_factor(unconditional_prcl))
+  mutate(ffsr_gnrl = haven::as_factor(ffsr_gnrl))
 
 # 5.1   Support for unconditional FFSR ####
 
 data_5.1 <- data_5 %>%
   select(-starts_with("rr_"),-mncp)%>%
+  mutate(unconditional_prcl = haven::as_factor(unconditional_prcl))%>%
   # Based on first examination
   select(-bici_dias, -starts_with("carro_combus"), -ccnr, -Group, -grp_ingrso, -protestas, -taxi_dias, -urban, - bici, -carro, -cc_econ, -cc_futuro, -gas_super, -moto,
-         -pais_confianza_congrs, -pais_confianza_parties, -prop_acrd_ning, -taxi, -transpub, -treatment)
+         -pais_congrs, -pais_parties, -prop_acrd_ning, -taxi, -transpub, -treatment)
 
 data_5.1 <- data_5.1 %>%
   # Create noise parameter
@@ -2771,7 +2761,390 @@ dev.off()
 rm(cw_accuracy, data_5, data_5.2.test, data_5.2.testing, data_5.2.train, data_5.2.training, data_5.2.testing_matrix, data_5.2.training_matrix,
    shap_A, shap_B, shap_B_1, shap_B_2, shap_B_3, time_3, time_4, evaluate_SHAP, P_5.1)
 
-# 5.2   Support for conditional FFSR ####
+# 5.2   Changes in support from unconditional to conditional support ####
+
+data_5.2 <- data_5 %>%
+  select(-rr_mas, -rr_mas_si, -status_quo, -unconditional_complet)%>%
+  mutate_at(vars(starts_with("rr_")), ~ . - unconditional_prcl)%>%
+  rename_at(vars(starts_with("rr_")), ~ str_replace(., "$", "_dif"))%>%
+  select(-unconditional_prcl, -C_no_frst, -conditional, -treatment, - starts_with("C_"), -mncp)
+
+# 5.2.1 Tuning hyperparameters ####
+
+for(i in c("rr_lmpsm_dif", "rr_pobre_dif", "rr_afctds_dif", "rr_impuesto_dif", "rr_deuda_dif",
+            "rr_etransp_dif", "rr_paz_dif", "rr_edu_dif", "rr_ncer_dif", "rr_deforst_dif")){
+  print(i)
+  
+  metrics_0 <- read.xlsx("Tuning_H2_Metrics.xlsx")
+  
+  data_5.2.1 <- data_5.2 %>%
+    rename(var_0 = i)%>%
+    select(- starts_with("rr_"))%>%
+    mutate(var_0 = ifelse(var_0 < 0, "Lower support",
+                          ifelse(var_0 > 0, "Higher support", "Neutral")))%>%
+    mutate(var_0 = factor(var_0, levels = c("Lower support", "Neutral", "Higher support")))
+  
+  data_5.2.1 <- data_5.2.1 %>%
+    # Create noise parameter
+    mutate(noise = rnorm(nrow(.),0,1))
+  
+  data_5.2.2 <- data_5.2.1 %>%
+    initial_split(prop = 0.8)
+  
+  # Data for training
+  data_5.2.train <- data_5.2.2 %>%
+    training()
+  
+  # Data for testing
+  data_5.2.test <- data_5.2.2 %>%
+    testing()
+  
+  rm(data_5.2.1, data_5.2.2)
+  
+  recipe_0 <- recipe(var_0 ~ .,
+                     data = data_5.2.train)%>%
+    # Deletes all columns with any NA
+    step_filter_missing(all_predictors(), threshold = 0)%>%
+    # Remove minimum number of columns such that correlations are less than 0.9
+    step_corr(all_numeric(), -all_outcomes(), threshold = 0.9)%>%
+    # should have very few unique observations for factors
+    # step_other(all_nominal(), -edad, -grp_ingrso, threshold = 0.03)%>%
+    step_dummy(all_nominal(), -all_outcomes())
+  
+  data_5.2.training <- recipe_0 %>%
+    prep(training = data_5.2.train)%>%
+    bake(new_data = NULL)
+  
+  data_5.2.testing <- recipe_0 %>%
+    prep(training = data_5.2.test)%>%
+    bake(new_data = NULL) 
+  
+  folds_1 <- vfold_cv(data_5.2.training, v = 5, strata = var_0)
+  
+  # Setup model to be tuned
+  
+  # Tuning time: 80 minutes
+  
+  model_brt <- boost_tree(
+    trees         = 1000,
+    tree_depth    = tune(), # maximum depth of tree
+    learn_rate    = tune(), # the higher the learning rate the faster - default 0.3
+    # min_n       = tune(),
+    mtry          = tune(), # fraction of features to be selected for each tree (0.5/0.7/1)
+    # stop_iter   = tune(),
+    # sample_size = tune()
+  )%>%
+    set_mode("classification")%>%
+    set_engine("xgboost")
+  
+  # Create a tuning grid - 16 different models for the tuning space
+  
+  grid_0 <- grid_latin_hypercube(
+    tree_depth(),
+    learn_rate(c(-3,-0.5)),# tuning parameters
+    mtry(c(round((ncol(data_5.2.training)-1)/2,0), ncol(data_5.2.training)-1)),
+    size = 20)%>%
+    # default parameters
+    bind_rows(data.frame(tree_depth = 6, learn_rate = 0.3, mtry = ncol(data_5.2.training)-1))
+  
+  # Tune the model - cover the entire parameter space without running every combination
+  
+  print("Start computing")
+  
+  doParallel::registerDoParallel()
+  
+  time_1 <- Sys.time()
+  
+  model_brt_1 <- tune_grid(model_brt,
+                           var_0 ~ .,
+                           resamples = folds_1,
+                           grid      = grid_0,
+                           metrics   = metric_set(accuracy, mn_log_loss, f_meas))
+  
+  time_2 <- Sys.time()
+  
+  doParallel::stopImplicitCluster()
+  
+  print("End computing")
+  
+  # Collect metrics of tuned models
+  
+  metrics_1 <- collect_metrics(model_brt_1)
+  
+  model_brt_1.1 <- select_best(model_brt_1, metric = "accuracy")
+  
+  metrics_1.1 <- metrics_1 %>%
+    filter(.config == model_brt_1.1$.config[1])%>%
+    mutate(outcome = i)
+  
+  metrics_0 <- metrics_0 %>%
+    bind_rows(metrics_1.1)
+  
+  write.xlsx(metrics_0, "Tuning_H2_Metrics.xlsx")
+}
+
+# 5.2.2 Fit best model after tuning ####
+
+metrics_0 <- read.xlsx("Tuning_H2_Metrics.xlsx")
+
+evaluate_SHAP <- function(shap_0, var_1){
+  shap_1.1 <- shap_0 %>%
+    as_tibble()%>%
+    summarise_all(~ mean(abs(.)))%>%
+    select(-BIAS)%>%
+    pivot_longer(everything(), names_to = "variable", values_to = "SHAP_contribution")%>%
+    arrange(desc(SHAP_contribution))%>%
+    mutate(tot_contribution = sum(SHAP_contribution))%>%
+    mutate(share_SHAP = SHAP_contribution/tot_contribution)%>%
+    select(-tot_contribution)%>%
+    mutate(var_0 = var_1)
+  
+  shap_1.2 <- shap_1.1 %>%
+    mutate(VAR_0 = case_when(grepl("dept_", variable) ~ "Department",
+                             grepl("mncp_", variable) ~ "Municipio",
+                             grepl("Province_", variable) ~ "Province",
+                             
+                             grepl(".COP", variable) ~ "Income",
+                             grepl("edad", variable) ~ "Age",
+                             grepl("gnro", variable) ~ "Gender",
+                             grepl("etnia_", variable) ~ "Ethnicity",
+                             grepl("ccnr", variable) ~ "Cooking fuel",
+                             grepl("edu_", variable) ~ "Education",
+                             grepl("urban", variable) ~ "Urban",
+                             grepl("trbjo_", variable) ~ "Occupation",
+                             grepl("moto_dias", variable)     ~ "Motorcycle (days)",
+                             grepl("carro_dias", variable)    ~ "Car (days)",
+                             grepl("transpub_dias", variable) ~ "Public transport (days)",
+                             grepl("taxi_dias", variable)     ~ "Taxi (days)",
+                             grepl("bici_dias", variable)     ~ "Bicycle (days)",
+                             
+                             grepl("benefic", variable) ~ "Benefitted",
+                             grepl("Group_", variable) ~ variable,
+                             variable %in% c("bici_Yes", "carro_Yes", "moto_Yes", "transpub_Yes", "taxi_Yes", "treatment", "noise") ~ variable,
+                             grepl("carro_combus", variable) ~ "Car combustible",
+                             grepl("cc_econ", variable)      ~ "cc_econ",
+                             grepl("cc_futuro", variable)    ~ "cc_futuro",
+                             grepl("cc_info", variable)      ~ "cc_info",
+                             grepl("cc_preocup", variable)   ~ "cc_preocup",
+                             grepl("cc_imp_co2", variable)   ~ "Climate policy should reduce emissions",
+                             grepl("cc_imp_pers", variable)  ~ "Climate policy should incur low costs",
+                             grepl("cc_imp_equit", variable) ~ "Climate policy should be equitable",
+                             grepl("derecho", variable) ~ "Right to receive subsidy",
+                             grepl("estrto", variable) ~ "estrto",
+                             grepl("grp_ingrso", variable) ~ "Income group",
+                             grepl("izq_der", variable) ~ "Left/right",
+                             grepl("dsl_super", variable) ~ "dsl_super",
+                             grepl("gas_super", variable) ~ "gas_super",
+                             grepl("ffsr_dsl", variable)  ~ "Is diesel subsidized?",
+                             grepl("ffsr_gas", variable)  ~ "ffsr_gas",
+                             grepl("ffsr_gnrl", variable) ~ "Are fuels subsidized?",
+                             grepl("pais_army",    variable) ~ "pais_army",
+                             grepl("pais_con_crt", variable) ~ "pais_con_crt",
+                             grepl("pais_congrs",  variable) ~ "pais_congrs",
+                             grepl("pais_parties", variable) ~ "pais_parties",
+                             grepl("pais_jst_crt", variable) ~ "pais_jst_crt",
+                             grepl("pais_gvnrs",   variable) ~ "pais_gvnrs",
+                             grepl("pais_mayors",  variable) ~ "pais_mayors",
+                             grepl("pais_prsdnt",  variable) ~ "pais_prsdnt",
+                             grepl("pais_police",  variable) ~ "pais_police",
+                             grepl("pais_econ", variable)  ~ "What is the economic situation",
+                             grepl("pais_dmcrc", variable) ~ "pais_dmcrc",
+                             grepl("pais_gnrl", variable)  ~ "pais_gnrl",
+                             grepl("pais_inst", variable) ~ "pais_inst",
+                             grepl("pais_indv", variable) ~ "pais_indv",
+                             grepl("yo_amnto", variable) ~ "Affected by price increase",
+                             grepl("pobre_amnto", variable) ~ "Poor affected by price increase",
+                             grepl("rica_amnto", variable)  ~ "Rich affected by price increase",
+                             grepl("pol_pres", variable) ~ "Voted for president",
+                             grepl("prop_acrd_labrl", variable) ~ "prop_acrd_labrl",
+                             grepl("prop_acrd_pensl", variable) ~ "prop_acrd_pensl",
+                             grepl("prop_acrd_fepc", variable)  ~ "Agree with FFSR",
+                             grepl("prop_acrd_salud", variable) ~ "prop_acrd_salud",
+                             grepl("prop_acrd_paz", variable)   ~ "prop_acrd_paz",
+                             grepl("prop_acrd_energ", variable) ~ "prop_acrd_energ",
+                             grepl("prop_acrd_ning", variable)  ~ "prop_acrd_ning",
+                             grepl("prsns", variable) ~ "Household size",
+                             grepl("protestas", variable) ~ "Protests",
+                             grepl("sesgo", variable) ~ "Bias",
+                             grepl("info_afic", variable) ~ "info_afic",
+                             grepl("info_nose", variable) ~ "info_nose",
+                             grepl("info_pernal", variable) ~ "info_pernal",
+                             grepl("info_perreg", variable) ~ "info_perreg",
+                             grepl("info_pscall", variable) ~ "info_pscall",
+                             grepl("info_radlol", variable) ~ "info_radlol",
+                             grepl("info_radnal", variable) ~ "info_radnal",
+                             grepl("info_redscl", variable) ~ "info_redscl",
+                             grepl("info_tvnal", variable) ~ "info_tvnal",
+                             grepl("info_tvreg", variable) ~ "info_tvreg",
+                             grepl("info_vlls", variable) ~ "info_vlls",
+                             grepl("info_voz", variable) ~ "info_voz",
+                             grepl("info_web", variable) ~ "info_web",
+                             grepl("frst_", variable) ~ "First",
+                             grepl("pol_prtds", variable) ~ "Pol_Prtds",
+                             grepl("_Yes", variable) ~ "Treatment",
+                             .default = NA))%>%
+    arrange(variable)%>%
+    group_by(VAR_0)%>%
+    summarise(share_SHAP = sum(share_SHAP))%>%
+    ungroup()%>%
+    arrange(desc(share_SHAP))%>%
+    mutate(var_0 = var_1)
+  
+  list_0 <- list("shap_1.1" = shap_1.1, "shap_1.2" = shap_1.2)
+  
+  return(list_0)
+}
+
+shap_0_A <- data.frame()
+shap_0_B <- data.frame()
+
+for(i in c("rr_lmpsm_dif", "rr_pobre_dif", "rr_afctds_dif", "rr_impuesto_dif", "rr_deuda_dif",
+           "rr_etransp_dif", "rr_paz_dif", "rr_edu_dif", "rr_ncer_dif", "rr_deforst_dif")){
+  
+  print(i)
+  print(Sys.time())
+  
+  data_5.2.1 <- data_5.2 %>%
+    rename(var_0 = i)%>%
+    select(- starts_with("rr_"))%>%
+    mutate(var_0 = ifelse(var_0 < 0, "Lower support",
+                          ifelse(var_0 > 0, "Higher support", "Neutral")))%>%
+    mutate(var_0 = factor(var_0, levels = c("Lower support", "Neutral", "Higher support")))
+  
+  data_5.2.1 <- data_5.2.1 %>%
+    # Create noise parameter
+    mutate(noise = rnorm(nrow(.),0,1))
+  
+  data_5.2.2 <- data_5.2.1 %>%
+    initial_split(prop = 0.8)
+  
+  # Data for training
+  data_5.2.train <- data_5.2.2 %>%
+    training()
+  
+  # Data for testing
+  data_5.2.test <- data_5.2.2 %>%
+    testing()
+  
+  rm(data_5.2.1, data_5.2.2)
+  
+  recipe_0 <- recipe(var_0 ~ .,
+                     data = data_5.2.train)%>%
+    # Deletes all columns with any NA
+    step_filter_missing(all_predictors(), threshold = 0)%>%
+    # Remove minimum number of columns such that correlations are less than 0.9
+    step_corr(all_numeric(), -all_outcomes(), threshold = 0.9)%>%
+    # should have very few unique observations for factors
+    # step_other(all_nominal(), -edad, -grp_ingrso, threshold = 0.03)%>%
+    step_dummy(all_nominal(), -all_outcomes())
+  
+  data_5.2.training <- recipe_0 %>%
+    prep(training = data_5.2.train)%>%
+    bake(new_data = NULL)
+  
+  data_5.2.testing <- recipe_0 %>%
+    prep(training = data_5.2.test)%>%
+    bake(new_data = NULL)
+  
+  metrics_X <- metrics_0 %>%
+    filter(outcome == i)
+  
+  model_brt <- boost_tree(
+    trees      = 1000,
+    tree_depth = metrics_X$tree_depth[1],    
+    learn_rate = metrics_X$learn_rate[1],
+    mtry       = metrics_X$mtry[1])%>%
+    set_mode("classification")%>%
+    set_engine("xgboost")
+  
+  model_brt_0 <- model_brt %>%
+    fit(var_0 ~ .,
+        data = data_5.2.training)
+  
+  predictions_0 <- augment(model_brt_0, new_data = data_5.2.testing) 
+  
+  accuracy(predictions_0, truth = var_0, estimate = .pred_class) # 0.59
+  
+  # Class-wise accuracy
+  cw_accuracy <- predictions_0 %>%
+    mutate(correct = ifelse(var_0 == .pred_class,1,0))%>%
+    group_by(var_0)%>%
+    summarise(class_accuracy = mean(correct))%>%
+    ungroup()
+  
+  mn_log_loss(predictions_0, truth = var_0, estimate = c(".pred_Lower support", ".pred_Neutral", ".pred_Higher support")) # 1.44
+  
+  conf_mat(predictions_0, truth = var_0, estimate = .pred_class)
+  
+  data_5.2.testing_matrix <- data_5.2.testing %>%
+    select(-var_0)%>%
+    as.matrix()
+  
+  data_5.2.training_matrix <- data_5.2.training %>%
+    select(-var_0)%>%
+    as.matrix()
+  
+  time_3 <- Sys.time()
+  
+  shap_1 <- predict(extract_fit_engine(model_brt_0),
+                    data_5.2.testing_matrix,
+                    predcontrib = TRUE,
+                    approxcontrib = FALSE)
+  
+  time_4 <- Sys.time()
+  
+  shap_A_1 <- evaluate_SHAP(shap_1[[1]], "Lower support")$shap_1.1
+  shap_A_2 <- evaluate_SHAP(shap_1[[2]], "Neutral")$shap_1.1
+  shap_A_3 <- evaluate_SHAP(shap_1[[3]], "Higher support")$shap_1.1
+  
+  shap_B_1 <- evaluate_SHAP(shap_1[[1]], "Lower support")$shap_1.2
+  shap_B_2 <- evaluate_SHAP(shap_1[[2]], "Neutral")$shap_1.2
+  shap_B_3 <- evaluate_SHAP(shap_1[[3]], "Higher support")$shap_1.2
+  
+  shap_A <- bind_rows(shap_A_1, shap_A_2, shap_A_3)%>%
+    mutate(Outcome = i)
+  shap_B <- bind_rows(shap_B_1, shap_B_2, shap_B_3)%>%
+    mutate(Outcome = i)
+  
+  rm(shap_A_1, shap_A_2, shap_A_3, shap_B_1, shap_B_2, shap_B_3)
+  
+  shap_0_A <- shap_0_A %>%
+    bind_rows(shap_A)
+  
+  shap_0_B <- shap_0_B %>%
+    bind_rows(shap_B)
+  
+}
+
+# What is the single most important feature across level predictions?
+
+shap_1_B <- shap_0_B %>%
+  arrange(Outcome, var_0, desc(share_SHAP))%>%
+  select(Outcome, var_0, VAR_0, share_SHAP)%>%
+  filter(share_SHAP >0)
+
+write.xlsx(shap_1_B, "ML_H2_Outcome.xlsx")
+
+shap_B_1 <- shap_B %>%
+  group_by(VAR_0)%>%
+  summarise(share_SHAP = mean(share_SHAP))%>%
+  ungroup()%>%
+  mutate(var_0 = "0")
+
+# Inspect characteristics that are below noise for every characteristic
+
+shap_B_2 <- shap_B %>%
+  bind_rows(shap_B_1)%>%
+  mutate(help = ifelse(VAR_0 == "noise", share_SHAP,0))%>%
+  group_by(var_0)%>%
+  mutate(help = sum(help))%>%
+  ungroup()%>%
+  # Lower than noise
+  filter(share_SHAP < help)%>%
+  group_by(VAR_0)%>%
+  summarise(number = n())%>%
+  ungroup()%>%
+  arrange(desc(number))
 
 # 5.3   Descriptive statistics in general ####
 
@@ -2917,32 +3290,39 @@ data_6.1.3 <- data_6.1.0 %>%
                                         "cc_imp_co2", "cc_imp_pers", "cc_imp_equit", "pol_pres", "izq_der", "prop_acrd_fepc", "prop_acrd_paz", "prop_acrd_energ",
                                         "pais_gnrl", "pais_army", "pais_police", "pais_prsdnt", "pais_dmcrc", "pais_econ",
                                         "ffsr_gnrl", "ffsr_dsl", "ffsr_gas", "benefic", "derecho", "yo_amnto", "pobre_amnto", "rica_amnto")))%>%
-  mutate(name = case_when(Term == "edad" ~ str_replace(name, "^", "Age: "),
-                          Term == "gnro" ~ str_replace(name, "^", "Gender: "),
-                          Term == "etnia" ~ str_replace(name, "^", "Ethnicity: "),
-                          Term == "Province" ~ str_replace(name, "^", "Province: "),
-                          Term == "edu" ~ str_replace(name, "^", "Education: "),
-                          Term == "ingrso" ~ str_replace(name, "^", "Income: "),
-                          Term == "grp_ingrso" ~ str_replace(name, "^", "Income group: "),
-                          Term == "moto" ~ str_replace(name, "^", "Motorcycle: "),
-                          Term == "carro" ~ str_replace(name, "^", "Car: "),
-                          Term == "transpub" ~ str_replace(name, "^", "Public transport: "),
-                          Term == "ccnr" ~ str_replace(name, "^", "Cooking fuel: "),
-                          Term == "cc_info" ~ str_replace(name, "^", "Informed about CC: "),
-                          Term == "cc_preocup" ~ str_replace(name, "^", "Worried about CC: "),
-                          
+  mutate(name = case_when(Term == "edad"         ~ str_replace(name, "^", "Age: "),
+                          Term == "gnro"         ~ str_replace(name, "^", "Gender: "),
+                          Term == "etnia"        ~ str_replace(name, "^", "Ethnicity: "),
+                          Term == "Province"     ~ str_replace(name, "^", "Province: "),
+                          Term == "edu"          ~ str_replace(name, "^", "Education: "),
+                          Term == "ingrso"       ~ str_replace(name, "^", "Income: "),
+                          Term == "grp_ingrso"   ~ str_replace(name, "^", "Income group: "),
+                          Term == "moto"         ~ str_replace(name, "^", "Motorcycle: "),
+                          Term == "carro"        ~ str_replace(name, "^", "Car: "),
+                          Term == "transpub"     ~ str_replace(name, "^", "Public transport: "),
+                          Term == "ccnr"         ~ str_replace(name, "^", "Cooking fuel: "),
+                          Term == "cc_info"      ~ str_replace(name, "^", "Informed about CC: "),
+                          Term == "cc_preocup"   ~ str_replace(name, "^", "Worried about CC: "),
+                          Term == "cc_imp_co2"   ~ str_replace(name, "^", "Climate policy - effective: "),
+                          Term == "cc_imp_pers"  ~ str_replace(name, "^", "Climate policy - low costs: "),
+                          Term == "cc_imp_equit" ~ str_replace(name, "^", "Climate policy - equity: "),
                           TRUE ~ name))%>%
   mutate(Row = ifelse(Term %in% c("edad", "gnro", "etnia", "Province", "edu", "ingrso", "grp_ingrso", "moto", "carro", "transpub", "ccnr", "cc_info", "cc_preocup", "cc_econ",
                                   "cc_imp_co2", "cc_imp_pers", "cc_imp_equit"),1,0))
+
 ggplot(filter(data_6.1.3, Row == 1), aes(x = name))+
+  geom_rect(aes(xmin = 0, xmax = Inf, ymin = 1.1535, ymax = 1.257), fill = "lightgrey")+
   geom_hline(aes(yintercept = 0))+
   facet_grid(Row ~ Term, scales = "free", space = "free")+
   geom_errorbar(aes(ymin = conf_low, ymax = conf_high))+
   geom_point(aes(y = coefficient))+
   coord_cartesian(ylim = c(-0.1,2.2))+
   theme_bw()+
+  ylab("Coefficient") +
+  xlab("")+
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
-        strip.text = element_blank())
+        strip.text = element_blank(),
+        axis.title.x = element_blank())
 
 # 6.2   H2 ####
 
@@ -3252,7 +3632,7 @@ rm(P_7.1, P_7.1.1, P_7.1.2, interest_df, data_7.1, data_7.1.0, data_7.1.0_cat, d
 
 data_7.2.1 <- data_0 %>%
   mutate(First_Stage = ifelse(Group == 1, "No","Yes"))%>%
-  mutate(Group = factor(Group))
+  mutate(Group = haven::as_factor(Group))
 
 prepare_specification_chart <- function(data_7.2_input, filter_0, rounded_0, outcome_0){
   
@@ -3292,7 +3672,7 @@ data_7.2_temp <- filter(data_7.2.1, if_all(c("filter_1b", "filter_2b", "filter_2
 data_7.2.1.0 <- prepare_specification_chart(data_7.2_temp,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","NA","Standard")%>%
   mutate(Type = "Baseline")
 
-rm(data_7.1_temp)
+rm(data_7.2_temp)
 
 # Various filtering criteria
 
@@ -3316,10 +3696,41 @@ for(i in c(2:20)){
 
 rm(combinations_H1, combinations_H1.1, data_7.2.1.1_temp)
 
-# Inclusion / exclusion of control group
-
 # Standard, binary, Three levels
+data_7.2.1_temp <- data_7.2.1 %>%
+  mutate(ffsr_prcl_2 = ifelse(ffsr_prcl %in% c(1,2),0,
+                            ifelse(ffsr_prcl %in% c(4,5),1, NA)),
+         ffsr_prcl_3 = ifelse(ffsr_prcl %in% c(1,2),1,
+                            ifelse(ffsr_prcl %in% c(3),2,
+                                   ifelse(ffsr_prcl %in% c(4,5),3,NA))))
+
+data_7.2.1_temp_2 <- data_7.2.1_temp %>%
+  mutate(NAs = ifelse(is.na(ffsr_prcl_2),1,0))%>%
+  group_by(ID)%>%
+  mutate(NAs = sum(NAs))%>%
+  ungroup()%>%
+  arrange(ID)%>%
+  filter(NAs == 0)%>%
+  mutate(ffsr_prcl = ffsr_prcl_2)
+
+data_7.2.1.2 <- prepare_specification_chart(data_7.2.1_temp_2,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Rounded","Binary")
+
+data_7.2.1_temp_3 <- data_7.2.1_temp %>%
+  mutate(ffsr_prcl = ffsr_prcl_3)
+
+data_7.2.1.3 <- prepare_specification_chart(data_7.2.1_temp_3,"1b_2b_2f_3b_3f_3h_3l_3n_3r_3t_3x","Rounded","Three levels")
+
 # Inclusion of control group and controls (Group / first-stage with/without control group)
+
+# No filter
+data_7.2.1.5 <- prepare_specification_chart(data_7.2.1,"No filter","NA","Standard")
+
+
+data_7.2.X <- data_7.2.1.0 %>%
+  bind_rows(data_7.2.1.1)%>%
+  bind_rows(data_7.2.1.2)%>%
+  bind_rows(data_7.2.1.3)%>%
+  bind_rows(data_7.2.1.5)
 
 # 7.2.1 H2.1 ####
 # 7.2.2 H2.2 ####
